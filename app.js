@@ -37,29 +37,47 @@ const addBrandBtn = document.getElementById("addBrandBtn");
 const exportExcelBtn = document.getElementById("exportExcelBtn");
 const templateFileInput = document.getElementById("templateFileInput");
 
-init();
+// Initialize the app
+initApp();
 
-async function init() {
+async function initApp() {
   try {
+    console.log('Starting app initialization...');
+    
     // Load data from Google Sheets
     const members = await fetchMembers();
     const brands = await fetchBrands();
     
+    console.log('Google Sheets members:', members);
+    console.log('Google Sheets brands:', brands);
+    
     // Update defaultMembers and defaultBrands if data loaded successfully
-    if (members.length > 0) {
-      defaultMembers.length = 0;
+    if (members && members.length > 0) {
+      console.log('Using members from Google Sheets');
+      while (defaultMembers.length > 0) defaultMembers.pop();
       defaultMembers.push(...members);
+    } else {
+      console.log('No members from Google Sheets, using fallback from data.js');
     }
     
-    if (brands.length > 0) {
-      defaultBrands.length = 0;
+    if (brands && brands.length > 0) {
+      console.log('Using brands from Google Sheets');
+      while (defaultBrands.length > 0) defaultBrands.pop();
       defaultBrands.push(...brands);
+    } else {
+      console.log('No brands from Google Sheets, using fallback from data.js');
     }
   } catch (error) {
     console.error('Error loading Google Sheets data:', error);
-    // Continue with data.js fallback
+    console.log('Continuing with data.js fallback');
   }
   
+  // Now initialize the UI with loaded data
+  init();
+}
+
+function init() {
+  console.log('Initializing UI with members:', defaultMembers.length, 'brands:', defaultBrands.length);
   applyTotalsCollapse(localStorage.getItem("dxi-totals-collapsed") === "1");
   renderPalette();
   renderTable();
