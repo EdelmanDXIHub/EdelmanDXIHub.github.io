@@ -7,7 +7,12 @@ async function fetchMembers() {
     const response = await fetch(`${GOOGLE_SHEETS_API}?action=getMembers`);
     const data = await response.json();
     if (Array.isArray(data)) {
-      return data.map(row => row['NAME_TEAM_MEMBERS'] || row['Name'] || '').filter(name => name);
+      return data
+        .map(row => {
+          // Handle different possible column names
+          return row['NAME_TEAM_MEMBERS'] || row['Name'] || row['name'] || '';
+        })
+        .filter(name => name && name.trim());
     }
     return [];
   } catch (error) {
@@ -22,12 +27,14 @@ async function fetchBrands() {
     const response = await fetch(`${GOOGLE_SHEETS_API}?action=getBrands`);
     const data = await response.json();
     if (Array.isArray(data)) {
-      return data.map(row => ({
-        id: row['ID_BRANDS'] || row['BrandId'] || '',
-        name: row['BransName_BRAN...'] || row['BrandName'] || '',
-        color: row['Color_BRANDS'] || row['Color'] || '#000000',
-        order: row['ORDER_BRANDS'] || 0
-      })).filter(b => b.id && b.name);
+      return data
+        .map(row => ({
+          id: row['ID_BRANDS'] || row['BrandId'] || row['id'] || '',
+          name: row['BransName_BRAN...'] || row['BrandName'] || row['name'] || '',
+          color: row['Color_BRANDS'] || row['Color'] || row['color'] || '#000000',
+          order: row['ORDER_BRANDS'] || row['Order'] || row['order'] || 0
+        }))
+        .filter(b => b.id && b.name);
     }
     return [];
   } catch (error) {
