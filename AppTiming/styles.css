@@ -1,0 +1,274 @@
+:root {
+  --bg: #f4f7f5;
+  --panel: #ffffff;
+  --line: #d8dfd9;
+  --text: #12251c;
+  --muted: #547267;
+  --accent: #0d7a5f;
+  --lunch: #eef1ef;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at top right, #d9efe6 0%, var(--bg) 45%);
+}
+
+.topbar {
+  padding: 16px 20px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.topbar p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 170px minmax(830px, 1fr) 270px;
+  gap: 12px;
+  padding: 12px;
+}
+
+.layout.totals-collapsed {
+  grid-template-columns: 170px minmax(830px, 1fr) 56px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.legend-panel,
+.totals-panel {
+  max-height: calc(100vh - 110px);
+  overflow: auto;
+}
+
+.totals-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.totals-panel.collapsed h3,
+.totals-panel.collapsed #brandTotals,
+.totals-panel.collapsed #memberTotals {
+  display: none;
+}
+
+.totals-panel.collapsed .totals-header h2 {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.totals-panel.collapsed .totals-header {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.palette-actions,
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+button,
+input[type="color"],
+input[type="text"] {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.88rem;
+}
+
+button {
+  background: #f9fcfa;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: #b5c8bc;
+}
+
+.brand-palette {
+  display: grid;
+  gap: 3px;
+}
+
+.brand-item {
+  display: grid;
+  grid-template-columns: auto 14px 1fr;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid #edf2ef;
+  border-radius: 5px;
+}
+
+.brand-item input {
+  margin: 0;
+}
+
+.swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  border: 1px solid #8a9d93;
+}
+
+.brand-name {
+  font-size: 0.64rem;
+  line-height: 1.1;
+}
+
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.62rem;
+  background: #fff;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #eff6f2;
+}
+
+th,
+td {
+  border: 1px solid var(--line);
+  text-align: center;
+  min-width: 14px;
+  height: 20px;
+}
+
+.member-head,
+.member-cell {
+  min-width: 145px;
+  text-align: left;
+  padding-left: 5px;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #f5fbf8;
+}
+
+.member-head {
+  z-index: 3;
+}
+
+.slot-cell {
+  cursor: pointer;
+}
+
+.slot-cell.lunch {
+  background: var(--lunch);
+  color: #74857d;
+  cursor: not-allowed;
+}
+
+.slot-cell:hover:not(.lunch) {
+  box-shadow: inset 0 0 0 2px rgba(13, 122, 95, 0.4);
+}
+
+.week-title th {
+  background: #dfeee7;
+  text-align: left;
+  padding: 3px 6px;
+  font-size: 0.68rem;
+}
+
+.day-header th {
+  background: #ecf5f0;
+  font-size: 0.63rem;
+}
+
+.time-header th {
+  background: #f4faf7;
+  font-size: 0.56rem;
+  white-space: nowrap;
+}
+
+th.day-gap,
+td.day-gap {
+  min-width: 10px;
+  width: 10px;
+  background: repeating-linear-gradient(
+    45deg,
+    #d4dfd9,
+    #d4dfd9 4px,
+    #e6eeea 4px,
+    #e6eeea 8px
+  );
+  border-left: 1px solid #9db3a7;
+  border-right: 1px solid #9db3a7;
+}
+
+.total-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+
+.total-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  background: #f6faf8;
+  border: 1px solid #ebf1ed;
+  font-size: 0.82rem;
+}
+
+h2,
+h3 {
+  margin: 6px 0 8px;
+}
+
+h3 {
+  margin-top: 14px;
+  font-size: 0.92rem;
+}
+
+@media (max-width: 1200px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .legend-panel,
+  .totals-panel {
+    max-height: none;
+  }
+}

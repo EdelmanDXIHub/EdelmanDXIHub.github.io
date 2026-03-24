@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DXI Timing Map - Feb 2026</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>DXI Timing Map</h1>
+      <p>February 2026 | 30-minute slots | 8:00 AM - 5:00 PM</p>
+    </header>
+
+    <main id="layoutMain" class="layout">
+      <aside class="panel legend-panel">
+        <h2>Brand Palette</h2>
+        <div class="palette-actions">
+          <button id="eraserBtn" type="button">Eraser</button>
+          <button id="addBrandBtn" type="button">Add Brand</button>
+        </div>
+        <div id="brandPalette" class="brand-palette"></div>
+      </aside>
+
+      <section class="panel scheduler-panel">
+        <h2>Interactive Schedule - Full Month (Feb 2026)</h2>
+
+        <div class="toolbar">
+          <button id="clearMonthBtn" type="button">Clear Full Month</button>
+          <button id="addMemberBtn" type="button">Add Team Member</button>
+          <button id="exportExcelBtn" type="button">Export Excel</button>
+          <input id="templateFileInput" type="file" accept=".xlsx" hidden />
+        </div>
+
+        <div class="table-wrap">
+          <table id="scheduleTable">
+            <thead id="scheduleHead"></thead>
+            <tbody id="scheduleBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside id="totalsPanel" class="panel totals-panel">
+        <div class="totals-header">
+          <h2>Totals</h2>
+          <button id="toggleTotalsBtn" type="button" aria-expanded="true">Collapse</button>
+        </div>
+        <h3>By Brand (Full Month)</h3>
+        <div id="brandTotals"></div>
+        <h3>By Team Member (Full Month)</h3>
+        <div id="memberTotals"></div>
+      </aside>
+    </main>
+
+    <template id="brandTemplate">
+      <label class="brand-item">
+        <input type="radio" name="activeBrand" />
+        <span class="swatch"></span>
+        <span class="brand-name"></span>
+      </label>
+    </template>
+
+    <script src="./data.js?v=4"></script>
+    <script src="./template-data.js?v=2"></script>
+    <script src="https://unpkg.com/xlsx-populate/browser/xlsx-populate.min.js"></script>
+    <script src="./app.js?v=19"></script>
+  </body>
+</html>
