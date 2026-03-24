@@ -39,7 +39,27 @@ const templateFileInput = document.getElementById("templateFileInput");
 
 init();
 
-function init() {
+async function init() {
+  try {
+    // Load data from Google Sheets
+    const members = await fetchMembers();
+    const brands = await fetchBrands();
+    
+    // Update defaultMembers and defaultBrands if data loaded successfully
+    if (members.length > 0) {
+      defaultMembers.length = 0;
+      defaultMembers.push(...members);
+    }
+    
+    if (brands.length > 0) {
+      defaultBrands.length = 0;
+      defaultBrands.push(...brands);
+    }
+  } catch (error) {
+    console.error('Error loading Google Sheets data:', error);
+    // Continue with data.js fallback
+  }
+  
   applyTotalsCollapse(localStorage.getItem("dxi-totals-collapsed") === "1");
   renderPalette();
   renderTable();
@@ -335,7 +355,7 @@ function attachEvents() {
     saveState();
   });
 
-  addMemberBtn.addEventListener("click", () => {
+  addMemberBtn.addEventListener("click", async () => {
     const name = prompt("New team member name:");
     if (!name || !name.trim()) return;
     const clean = name.trim();
@@ -343,6 +363,14 @@ function attachEvents() {
       alert("Team member already exists.");
       return;
     }
+    
+    // Add to Google Sheets
+    const saved = await addMemberToSheets(clean);
+    if (!saved) {
+      // Still add locally if sheet save fails
+      console.warn('Could not save member to Google Sheets');
+    }
+    
     state.members.push(clean);
     for (const day of weekdays) state.assignments[day.key][clean] = slots.map((slot) => (slot.isLunch ? "LUNCH" : null));
     renderTable();
@@ -350,7 +378,7 @@ function attachEvents() {
     saveState();
   });
 
-  addBrandBtn.addEventListener("click", () => {
+  addBrandBtn.addEventListener("click", async () => {
     const name = prompt("Brand name:");
     if (!name || !name.trim()) return;
     const color = prompt("Hex color (example: #1D3557):", "#1D3557");
@@ -359,7 +387,16 @@ function attachEvents() {
       return;
     }
     const id = `b${Date.now()}`;
-    state.brands.push({ id, name: name.trim(), color: color.trim().toUpperCase() });
+    const cleanColor = color.trim().toUpperCase();
+    
+    // Add to Google Sheets
+    const order = state.brands.length + 1;
+    const saved = await addBrandToSheets(id, name.trim(), cleanColor, order);
+    if (!saved) {
+      console.warn('Could not save brand to Google Sheets');
+    }
+    
+    state.brands.push({ id, name: name.trim(), color: cleanColor });
     selectedBrandId = id;
     paintMode = "brand";
     renderPalette();
