@@ -4,15 +4,27 @@ const GOOGLE_SHEETS_API = 'https://script.google.com/macros/s/AKfycbzxK0u26mDGZq
 // Fetch members from Google Sheets
 async function fetchMembers() {
   try {
+    console.log('Fetching members from Google Sheets...');
     const response = await fetch(`${GOOGLE_SHEETS_API}?action=getMembers`);
+    console.log('Response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
     const data = await response.json();
+    console.log('Members data received:', data);
+    
     if (Array.isArray(data)) {
-      return data
+      const members = data
         .map(row => {
-          // Handle different possible column names
+          console.log('Processing row:', row);
           return row['NAME_TEAM_MEMBERS'] || row['Name'] || row['name'] || '';
         })
         .filter(name => name && name.trim());
+      
+      console.log('Final members:', members);
+      return members;
     }
     return [];
   } catch (error) {
@@ -24,17 +36,32 @@ async function fetchMembers() {
 // Fetch brands from Google Sheets
 async function fetchBrands() {
   try {
+    console.log('Fetching brands from Google Sheets...');
     const response = await fetch(`${GOOGLE_SHEETS_API}?action=getBrands`);
+    console.log('Response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
     const data = await response.json();
+    console.log('Brands data received:', data);
+    
     if (Array.isArray(data)) {
-      return data
-        .map(row => ({
-          id: row['ID_BRANDS'] || row['BrandId'] || row['id'] || '',
-          name: row['BransName_BRAN...'] || row['BrandName'] || row['name'] || '',
-          color: row['Color_BRANDS'] || row['Color'] || row['color'] || '#000000',
-          order: row['ORDER_BRANDS'] || row['Order'] || row['order'] || 0
-        }))
+      const brands = data
+        .map(row => {
+          console.log('Processing brand row:', row);
+          return {
+            id: row['ID_BRANDS'] || row['BrandId'] || row['id'] || '',
+            name: row['BransName_BRAN...'] || row['BrandName'] || row['name'] || '',
+            color: row['Color_BRANDS'] || row['Color'] || row['color'] || '#000000',
+            order: row['ORDER_BRANDS'] || row['Order'] || row['order'] || 0
+          };
+        })
         .filter(b => b.id && b.name);
+      
+      console.log('Final brands:', brands);
+      return brands;
     }
     return [];
   } catch (error) {
@@ -46,6 +73,7 @@ async function fetchBrands() {
 // Add member to Google Sheets
 async function addMemberToSheets(name) {
   try {
+    console.log('Adding member:', name);
     const response = await fetch(GOOGLE_SHEETS_API, {
       method: 'POST',
       body: JSON.stringify({
@@ -54,6 +82,7 @@ async function addMemberToSheets(name) {
       })
     });
     const result = await response.json();
+    console.log('Add member result:', result);
     return result.success || false;
   } catch (error) {
     console.error('Error adding member:', error);
@@ -64,6 +93,7 @@ async function addMemberToSheets(name) {
 // Add brand to Google Sheets
 async function addBrandToSheets(id, name, color, order) {
   try {
+    console.log('Adding brand:', id, name, color, order);
     const response = await fetch(GOOGLE_SHEETS_API, {
       method: 'POST',
       body: JSON.stringify({
@@ -75,6 +105,7 @@ async function addBrandToSheets(id, name, color, order) {
       })
     });
     const result = await response.json();
+    console.log('Add brand result:', result);
     return result.success || false;
   } catch (error) {
     console.error('Error adding brand:', error);
