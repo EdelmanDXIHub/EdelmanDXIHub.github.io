@@ -97,6 +97,17 @@ function init() {
   renderTable();
   renderTotals();
   attachEvents();
+  
+  // Sync initial state to Google Sheets (if not already synced)
+  if (!localStorage.getItem('SYNCED_TO_SHEETS')) {
+    console.log('Syncing initial schedule to Google Sheets...');
+    saveScheduleToSheets(state.assignments).then(() => {
+      localStorage.setItem('SYNCED_TO_SHEETS', 'true');
+      console.log('Initial sync complete');
+    }).catch(error => {
+      console.error('Initial sync failed:', error);
+    });
+  }
 }
 
 function ensureRequiredBrands(brands) {
