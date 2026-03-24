@@ -144,28 +144,43 @@ function createInitialState() {
 
 function loadState() {
   try {
+    // Only load assignments from localStorage - members and brands come from Google Sheets
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed?.members || !parsed?.brands || !parsed?.assignments) return null;
+    if (!parsed?.assignments) return null;
 
-    parsed.brands = ensureRequiredBrands(parsed.brands);
+    // Use current defaultMembers and defaultBrands (from Google Sheets)
+    const state = {
+      members: [...defaultMembers],
+      brands: [...defaultBrands],
+      assignments: parsed.assignments,
+      selectedBrandId: defaultBrands[0]?.id
+    };
+
+    // Ensure all days and members exist in assignments
     for (const day of weekdays) {
-      parsed.assignments[day.key] ||= {};
-      for (const member of parsed.members) {
-        parsed.assignments[day.key][member] ||= Array.from({ length: slots.length }, () => null);
-        for (const slot of slots) if (slot.isLunch) parsed.assignments[day.key][member][slot.index] = "LUNCH";
+      state.assignments[day.key] ||= {};
+      for (const member of state.members) {
+        state.assignments[day.key][member] ||= Array.from({ length: slots.length }, () => null);
+        for (const slot of slots) if (slot.isLunch) state.assignments[day.key][member][slot.index] = "LUNCH";
       }
     }
-    return parsed;
+    
+    console.log('Loaded assignments from localStorage with updated members/brands from Google Sheets');
+    return state;
   } catch {
     return null;
   }
 }
 
 function saveState() {
-  state.selectedBrandId = selectedBrandId;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  // Only save assignments to localStorage - members and brands come from Google Sheets
+  const toSave = {
+    assignments: state.assignments,
+    selectedBrandId: selectedBrandId
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
 }
 
 function renderPalette() {
