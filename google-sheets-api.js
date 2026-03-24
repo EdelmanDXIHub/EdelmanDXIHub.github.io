@@ -1,5 +1,5 @@
 // Google Apps Script endpoint
-const GOOGLE_SHEETS_API = 'https://script.google.com/macros/s/AKfycbzxK0u26mDGZqjLx0YlPM2_VxQBetAqSs_eUr3-upe_7IbCcHPk08huiMYVMESWfilVcw/exec';
+const GOOGLE_SHEETS_API = 'https://script.google.com/macros/s/AKfycbw8a2K-pQ54ml9DxBch9bmXjiQDTaSCwnZfmQ87QYWc-hTtlcClKcALr5ac8u-RRzdvBw/exec';
 
 // Fetch members from Google Sheets
 async function fetchMembers() {
