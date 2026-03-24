@@ -1,3 +1,5 @@
+console.log('app.js loaded');
+
 const STORAGE_KEY = "dxi-timing-map-feb-2026-v8";
 const PRELOADED = window.PRELOADED_DATA || null;
 
