@@ -8,7 +8,7 @@ function doGet(e) {
     } else if (action === 'getBrands') {
       return getBrandsData(sheet);
     } else if (action === 'getSchedule') {
-      return getSheetData(sheet, 'Schedule');
+      return getScheduleData(sheet);
     }
     return ContentService.createTextOutput(JSON.stringify({error: 'Invalid action'})).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
@@ -29,7 +29,7 @@ function doPost(e) {
       addRow(sheet, 'Brands', [data.id, data.name, data.color, data.order]);
       return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
     } else if (action === 'saveSchedule') {
-      // Handle schedule updates
+      saveScheduleData(sheet, data.assignments);
       return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
     }
     return ContentService.createTextOutput(JSON.stringify({error: 'Invalid action'})).setMimeType(ContentService.MimeType.JSON);
@@ -75,6 +75,24 @@ function getBrandsData(spreadsheet) {
   }
 }
 
+function getScheduleData(spreadsheet) {
+  try {
+    const sheet = spreadsheet.getSheetByName('Schedule');
+    if (!sheet) {
+      return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
+    }
+    const cell = sheet.getRange('A1').getValue();
+    if (!cell || cell === '') {
+      return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
+    }
+    const parsed = JSON.parse(cell);
+    return ContentService.createTextOutput(JSON.stringify(parsed)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    Logger.log('Error reading schedule: ' + error);
+    return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 function addRow(spreadsheet, sheetName, values) {
   try {
     const sheet = spreadsheet.getSheetByName(sheetName);
@@ -82,6 +100,23 @@ function addRow(spreadsheet, sheetName, values) {
     return true;
   } catch (error) {
     Logger.log('Error adding row: ' + error);
+    return false;
+  }
+}
+
+function saveScheduleData(spreadsheet, scheduleData) {
+  try {
+    const sheet = spreadsheet.getSheetByName('Schedule');
+    if (!sheet) {
+      Logger.log('Schedule sheet not found');
+      return false;
+    }
+    const jsonString = JSON.stringify(scheduleData);
+    sheet.getRange('A1').setValue(jsonString);
+    Logger.log('Schedule saved: ' + jsonString.substring(0, 100) + '...');
+    return true;
+  } catch (error) {
+    Logger.log('Error saving schedule: ' + error);
     return false;
   }
 }

@@ -47,38 +47,21 @@ async function initApp() {
   try {
     console.log('Starting app initialization...');
     
-    // Load data from Google Sheets
-    const members = await fetchMembers();
-    const brands = await fetchBrands();
+    // Members and brands are now in data.js (PRELOADED_DATA)
+    // defaultMembers and defaultBrands are already set from PRELOADED
+    console.log('Using members from data.js:', defaultMembers.length);
+    console.log('Using brands from data.js:', defaultBrands.length);
+    
+    // Only load schedule/assignments from Google Sheets
     const schedule = await loadScheduleFromSheets();
-    
-    console.log('Google Sheets members:', members);
-    console.log('Google Sheets brands:', brands);
     console.log('Google Sheets schedule:', schedule);
-    
-    // Update defaultMembers and defaultBrands if data loaded successfully
-    if (members && members.length > 0) {
-      console.log('Using members from Google Sheets');
-      while (defaultMembers.length > 0) defaultMembers.pop();
-      defaultMembers.push(...members);
-    } else {
-      console.log('No members from Google Sheets, using fallback from data.js');
-    }
-    
-    if (brands && brands.length > 0) {
-      console.log('Using brands from Google Sheets');
-      while (defaultBrands.length > 0) defaultBrands.pop();
-      defaultBrands.push(...brands);
-    } else {
-      console.log('No brands from Google Sheets, using fallback from data.js');
-    }
     
     // Store schedule from Google Sheets for later use
     window.GOOGLE_SHEETS_SCHEDULE = schedule || null;
     
   } catch (error) {
-    console.error('Error loading Google Sheets data:', error);
-    console.log('Continuing with data.js fallback');
+    console.error('Error loading schedule from Google Sheets:', error);
+    console.log('Will use local/fallback schedule');
   }
   
   // Now initialize the UI with loaded data
@@ -167,7 +150,7 @@ function createInitialState() {
 
 function loadState() {
   try {
-    // Try to load schedule from Google Sheets first
+    // Priority 1: Try to load schedule from Google Sheets first (for sync across devices)
     if (window.GOOGLE_SHEETS_SCHEDULE && Object.keys(window.GOOGLE_SHEETS_SCHEDULE).length > 0) {
       console.log('Loading state from Google Sheets');
       const state = {
@@ -189,7 +172,29 @@ function loadState() {
       return state;
     }
     
-    // Fallback to localStorage
+    // Priority 2: Try to load from PRELOADED_DATA (data.js initial schedule)
+    if (PRELOADED?.assignments && Object.keys(PRELOADED.assignments).length > 0) {
+      console.log('Loading state from data.js (PRELOADED_DATA)');
+      const state = {
+        members: [...defaultMembers],
+        brands: [...defaultBrands],
+        assignments: JSON.parse(JSON.stringify(PRELOADED.assignments)), // Deep copy
+        selectedBrandId: defaultBrands[0]?.id
+      };
+      
+      // Ensure all days and members exist
+      for (const day of weekdays) {
+        state.assignments[day.key] ||= {};
+        for (const member of state.members) {
+          state.assignments[day.key][member] ||= Array.from({ length: slots.length }, () => null);
+          for (const slot of slots) if (slot.isLunch) state.assignments[day.key][member][slot.index] = "LUNCH";
+        }
+      }
+      
+      return state;
+    }
+    
+    // Priority 3: Fallback to localStorage
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
@@ -210,7 +215,7 @@ function loadState() {
       }
     }
     
-    console.log('Loaded assignments from localStorage with updated members/brands from Google Sheets');
+    console.log('Loaded state from localStorage');
     return state;
   } catch {
     return null;
