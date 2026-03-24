@@ -11,6 +11,11 @@ const REPO_PATH = process.env.REPO_PATH || __dirname;
 app.use(cors());
 app.use(express.json());
 
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.json({ message: 'AppTiming sync server is running' });
+});
+
 // Save changes to data.js and push to GitHub
 app.post('/api/sync', (req, res) => {
   try {
@@ -27,10 +32,21 @@ app.post('/api/sync', (req, res) => {
 
     // Git operations
     try {
+      const gitUser = process.env.GIT_USER || 'AppTiming Bot';
+      const gitPass = process.env.GIT_PASS || '';
+      
       execSync('git config user.email "sync@apptiming.com"', { cwd: REPO_PATH });
-      execSync('git config user.name "AppTiming Bot"', { cwd: REPO_PATH });
+      execSync(`git config user.name "${gitUser}"`, { cwd: REPO_PATH });
       execSync('git add data.js', { cwd: REPO_PATH });
       execSync('git commit -m "Update: Sync changes from web app"', { cwd: REPO_PATH });
+      
+      if (gitPass) {
+        // Use token for authentication
+        const repoUrl = execSync('git config --get remote.origin.url', { cwd: REPO_PATH }).toString().trim();
+        const httpsUrl = repoUrl.replace(/git@github\.com:(.+)\/(.+)\.git/, 'https://$1:$2.git');
+        execSync(`git remote set-url origin https://${gitUser}:${gitPass}@github.com/${gitUser}/EdelmanDXIHub.github.io.git`, { cwd: REPO_PATH });
+      }
+      
       execSync('git push origin main', { cwd: REPO_PATH });
     } catch (gitError) {
       // Ignore if no changes to commit
