@@ -536,6 +536,7 @@ function attachEvents() {
     isMouseDown = false;
     renderTable();
     renderTotals();
+    saveState();
   });
 
   document.addEventListener("mouseup", () => {
@@ -543,6 +544,7 @@ function attachEvents() {
     isMouseDown = false;
     renderTable();
     renderTotals();
+    saveState();
   });
 }
 
