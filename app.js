@@ -18,8 +18,9 @@ const lunchSlots = new Set(slots.filter((s) => s.isLunch).map((s) => s.index));
 const weekdays = buildFebruaryWeekdays();
 const weeks = chunkWeekdays(weekdays, 5);
 
-const state = loadState() || createInitialState();
-let selectedBrandId = state.selectedBrandId || state.brands[0]?.id || null;
+// Will be initialized after Google Sheets loads
+let state;
+let selectedBrandId;
 let paintMode = "brand";
 let isMouseDown = false;
 
@@ -80,6 +81,11 @@ async function initApp() {
 
 function init() {
   console.log('Initializing UI with members:', defaultMembers.length, 'brands:', defaultBrands.length);
+  
+  // Create state NOW with the updated defaultMembers and defaultBrands from Google Sheets
+  state = loadState() || createInitialState();
+  selectedBrandId = state.selectedBrandId || state.brands[0]?.id || null;
+  
   applyTotalsCollapse(localStorage.getItem("dxi-totals-collapsed") === "1");
   renderPalette();
   renderTable();
