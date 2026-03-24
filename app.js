@@ -50,9 +50,11 @@ async function initApp() {
     // Load data from Google Sheets
     const members = await fetchMembers();
     const brands = await fetchBrands();
+    const schedule = await loadScheduleFromSheets();
     
     console.log('Google Sheets members:', members);
     console.log('Google Sheets brands:', brands);
+    console.log('Google Sheets schedule:', schedule);
     
     // Update defaultMembers and defaultBrands if data loaded successfully
     if (members && members.length > 0) {
@@ -70,6 +72,10 @@ async function initApp() {
     } else {
       console.log('No brands from Google Sheets, using fallback from data.js');
     }
+    
+    // Store schedule from Google Sheets for later use
+    window.GOOGLE_SHEETS_SCHEDULE = schedule || null;
+    
   } catch (error) {
     console.error('Error loading Google Sheets data:', error);
     console.log('Continuing with data.js fallback');
@@ -150,13 +156,34 @@ function createInitialState() {
 
 function loadState() {
   try {
-    // Only load assignments from localStorage - members and brands come from Google Sheets
+    // Try to load schedule from Google Sheets first
+    if (window.GOOGLE_SHEETS_SCHEDULE && Object.keys(window.GOOGLE_SHEETS_SCHEDULE).length > 0) {
+      console.log('Loading state from Google Sheets');
+      const state = {
+        members: [...defaultMembers],
+        brands: [...defaultBrands],
+        assignments: window.GOOGLE_SHEETS_SCHEDULE,
+        selectedBrandId: defaultBrands[0]?.id
+      };
+      
+      // Ensure all days and members exist
+      for (const day of weekdays) {
+        state.assignments[day.key] ||= {};
+        for (const member of state.members) {
+          state.assignments[day.key][member] ||= Array.from({ length: slots.length }, () => null);
+          for (const slot of slots) if (slot.isLunch) state.assignments[day.key][member][slot.index] = "LUNCH";
+        }
+      }
+      
+      return state;
+    }
+    
+    // Fallback to localStorage
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.assignments) return null;
 
-    // Use current defaultMembers and defaultBrands (from Google Sheets)
     const state = {
       members: [...defaultMembers],
       brands: [...defaultBrands],
@@ -164,7 +191,6 @@ function loadState() {
       selectedBrandId: defaultBrands[0]?.id
     };
 
-    // Ensure all days and members exist in assignments
     for (const day of weekdays) {
       state.assignments[day.key] ||= {};
       for (const member of state.members) {
@@ -181,12 +207,17 @@ function loadState() {
 }
 
 function saveState() {
-  // Only save assignments to localStorage - members and brands come from Google Sheets
+  // Save to localStorage
   const toSave = {
     assignments: state.assignments,
     selectedBrandId: selectedBrandId
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+  
+  // Also save to Google Sheets (async, non-blocking)
+  saveScheduleToSheets(state.assignments).catch(error => {
+    console.error('Failed to sync to Google Sheets:', error);
+  });
 }
 
 function renderPalette() {

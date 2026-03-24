@@ -116,17 +116,44 @@ async function addBrandToSheets(id, name, color, order) {
 // Save schedule changes to Google Sheets
 async function saveScheduleToSheets(scheduleData) {
   try {
+    console.log('Saving schedule to Google Sheets...');
     const response = await fetch(GOOGLE_SHEETS_API, {
       method: 'POST',
       body: JSON.stringify({
         action: 'saveSchedule',
-        data: scheduleData
+        assignments: scheduleData
       })
     });
     const result = await response.json();
+    console.log('Schedule saved result:', result);
     return result.success || false;
   } catch (error) {
     console.error('Error saving schedule:', error);
     return false;
+  }
+}
+
+// Load schedule from Google Sheets
+async function loadScheduleFromSheets() {
+  try {
+    console.log('Loading schedule from Google Sheets...');
+    const response = await fetch(`${GOOGLE_SHEETS_API}?action=getSchedule`);
+    console.log('Schedule response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('Schedule data received:', data);
+    
+    if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+      console.log('Schedule loaded from Google Sheets');
+      return data;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error loading schedule:', error);
+    return null;
   }
 }
