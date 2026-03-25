@@ -37,31 +37,95 @@ const eraserBtn = document.getElementById("eraserBtn");
 const clearMonthBtn = document.getElementById("clearMonthBtn");
 const addMemberBtn = document.getElementById("addMemberBtn");
 const addBrandBtn = document.getElementById("addBrandBtn");
+const refreshFromSheetBtn = document.getElementById("refreshFromSheetBtn");
 const exportExcelBtn = document.getElementById("exportExcelBtn");
 const templateFileInput = document.getElementById("templateFileInput");
+
+// Loading & status indicators
+const loadingIndicator = document.getElementById("loadingIndicator");
+const statusMessage = document.getElementById("statusMessage");
+
+// Context menu for member actions
+const memberContextMenu = document.getElementById("memberContextMenu");
+const contextEditMember = document.getElementById("contextEditMember");
+const contextDeleteMember = document.getElementById("contextDeleteMember");
+let selectedMemberForAction = null;
 
 // Initialize the app
 initApp();
 
+// Helper functions for UI feedback
+function showLoading(show = true) {
+  loadingIndicator.style.display = show ? "block" : "none";
+}
+
+function showStatus(message, type = "success") {
+  statusMessage.textContent = message;
+  statusMessage.className = `status-message ${type}`;
+  statusMessage.style.display = "block";
+  
+  // Auto-hide after 5 seconds
+  if (type === "success") {
+    setTimeout(() => {
+      statusMessage.style.display = "none";
+    }, 5000);
+  }
+}
+
+async function refreshFromSheet() {
+  try {
+    refreshFromSheetBtn.disabled = true;
+    showLoading(true);
+    console.log('Manual refresh from Google Sheet initiated...');
+    
+    // Load fresh schedule from Google Sheets
+    const sheetsSchedule = await loadScheduleFromSheets();
+    
+    if (sheetsSchedule && Object.keys(sheetsSchedule).length > 0) {
+      // Update state with fresh data
+      Object.assign(state.assignments, sheetsSchedule);
+      saveState();
+      
+      // Re-render UI
+      renderTable();
+      renderTotals();
+      
+      showLoading(false);
+      showStatus("Schedule synced from Google Sheet!", "success");
+      console.log('Refresh complete - schedule updated');
+    } else {
+      showLoading(false);
+      showStatus("No data found in Google Sheet. Using local version.", "error");
+      console.warn('Google Sheet returned empty data');
+    }
+  } catch (error) {
+    showLoading(false);
+    console.error('Error refreshing from sheet:', error);
+    showStatus("Failed to sync. Check console for details.", "error");
+  } finally {
+    refreshFromSheetBtn.disabled = false;
+  }
+}
+
 async function initApp() {
   try {
+    showLoading(true);
     console.log('Starting app initialization...');
+    console.log('Loading LATEST schedule from Google Sheets...');
     
-    // Members and brands are now in data.js (PRELOADED_DATA)
-    // defaultMembers and defaultBrands are already set from PRELOADED
-    console.log('Using members from data.js:', defaultMembers.length);
-    console.log('Using brands from data.js:', defaultBrands.length);
+    // Always load the LATEST schedule from Google Sheets (not local cache)
+    const sheetsSchedule = await loadScheduleFromSheets();
+    console.log('Google Sheets schedule loaded:', sheetsSchedule ? Object.keys(sheetsSchedule).length + ' days' : 'empty');
     
-    // Only load schedule/assignments from Google Sheets
-    const schedule = await loadScheduleFromSheets();
-    console.log('Google Sheets schedule:', schedule);
-    
-    // Store schedule from Google Sheets for later use
-    window.GOOGLE_SHEETS_SCHEDULE = schedule || null;
+    // Store schedule from Google Sheets for use in init()
+    window.GOOGLE_SHEETS_SCHEDULE = sheetsSchedule || null;
     
   } catch (error) {
     console.error('Error loading schedule from Google Sheets:', error);
     console.log('Will use local/fallback schedule');
+    window.GOOGLE_SHEETS_SCHEDULE = null;
+  } finally {
+    showLoading(false);
   }
   
   // Now initialize the UI with loaded data
@@ -69,10 +133,25 @@ async function initApp() {
 }
 
 function init() {
-  console.log('Initializing UI with members:', defaultMembers.length, 'brands:', defaultBrands.length);
+  console.log('Initializing UI with fresh data from Google Sheets...');
   
-  // Create state NOW with the updated defaultMembers and defaultBrands from Google Sheets
-  state = loadState() || createInitialState();
+  // If we have fresh Google Sheets data, use it to rebuild state
+  if (window.GOOGLE_SHEETS_SCHEDULE) {
+    console.log('Syncing Google Sheets data into local state...');
+    
+    // Create initial state structure
+    state = createInitialState();
+    
+    // Overlay Google Sheets assignments onto the state
+    Object.assign(state.assignments, window.GOOGLE_SHEETS_SCHEDULE);
+    
+    console.log('State updated with Google Sheets data');
+  } else {
+    // Fallback to local state if Google Sheets failed
+    state = loadState() || createInitialState();
+    console.log('📦 Using local state (Google Sheets unavailable)');
+  }
+  
   selectedBrandId = state.selectedBrandId || state.brands[0]?.id || null;
   
   applyTotalsCollapse(localStorage.getItem("dxi-totals-collapsed") === "1");
@@ -81,16 +160,9 @@ function init() {
   renderTotals();
   attachEvents();
   
-  // Sync initial state to Google Sheets (if not already synced)
-  if (!localStorage.getItem('SYNCED_TO_SHEETS')) {
-    console.log('Syncing initial schedule to Google Sheets...');
-    saveScheduleToSheets(state.assignments).then(() => {
-      localStorage.setItem('SYNCED_TO_SHEETS', 'true');
-      console.log('Initial sync complete');
-    }).catch(error => {
-      console.error('Initial sync failed:', error);
-    });
-  }
+  // Save the updated state locally for offline access
+  saveState();
+  console.log('Local state saved');
 }
 
 function ensureRequiredBrands(brands) {
@@ -321,6 +393,10 @@ function renderTable() {
       const memberCell = document.createElement("td");
       memberCell.className = "member-cell";
       memberCell.textContent = `${member} (${memberMonthHours(member).toFixed(1)}h)`;
+      // Add context menu for member actions
+      memberCell.addEventListener("contextmenu", (event) => {
+        showMemberContextMenu(event, member);
+      });
       tr.appendChild(memberCell);
 
       for (let i = 0; i < weekDays.length; i += 1) {
@@ -419,6 +495,87 @@ function applyToCell(member, dayKey, slotIndex) {
   saveState();
 }
 
+// Member management functions
+
+function showMemberContextMenu(event, memberName) {
+  event.preventDefault();
+  selectedMemberForAction = memberName;
+  memberContextMenu.style.display = "block";
+  memberContextMenu.style.left = event.clientX + "px";
+  memberContextMenu.style.top = event.clientY + "px";
+}
+
+function hideMemberContextMenu() {
+  memberContextMenu.style.display = "none";
+  selectedMemberForAction = null;
+}
+
+async function editMember(memberName) {
+  const newName = prompt(`Rename "${memberName}" to:`, memberName);
+  if (!newName || !newName.trim()) return;
+  
+  const trimmedName = newName.trim();
+  
+  if (trimmedName === memberName) {
+    hideMemberContextMenu();
+    return;
+  }
+  
+  if (state.members.includes(trimmedName)) {
+    alert("A team member with that name already exists.");
+    hideMemberContextMenu();
+    return;
+  }
+  
+  // Update member name in state
+  const memberIndex = state.members.indexOf(memberName);
+  if (memberIndex === -1) {
+    hideMemberContextMenu();
+    return;
+  }
+  
+  state.members[memberIndex] = trimmedName;
+  
+  // Update all assignments for this member
+  for (const day of weekdays) {
+    const dayAssignments = state.assignments[day.key];
+    dayAssignments[trimmedName] = dayAssignments[memberName];
+    delete dayAssignments[memberName];
+  }
+  
+  saveState();
+  renderTable();
+  renderTotals();
+  hideMemberContextMenu();
+}
+
+async function deleteMember(memberName) {
+  const confirmed = confirm(`Delete team member "${memberName}" from the schedule?\n\nThis cannot be undone.`);
+  if (!confirmed) {
+    hideMemberContextMenu();
+    return;
+  }
+  
+  // Remove member from state
+  const memberIndex = state.members.indexOf(memberName);
+  if (memberIndex === -1) {
+    hideMemberContextMenu();
+    return;
+  }
+  
+  state.members.splice(memberIndex, 1);
+  
+  // Remove all assignments for this member
+  for (const day of weekdays) {
+    delete state.assignments[day.key][memberName];
+  }
+  
+  saveState();
+  renderTable();
+  renderTotals();
+  hideMemberContextMenu();
+}
+
 function attachEvents() {
   toggleTotalsBtn.addEventListener("click", () => {
     const collapsed = !totalsPanel.classList.contains("collapsed");
@@ -500,6 +657,8 @@ function attachEvents() {
     templateFileInput.click();
   });
 
+  refreshFromSheetBtn.addEventListener("click", refreshFromSheet);
+
   templateFileInput.addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -545,6 +704,33 @@ function attachEvents() {
     renderTable();
     renderTotals();
     saveState();
+  });
+
+  // Context menu event listeners
+  contextEditMember.addEventListener("click", () => {
+    if (selectedMemberForAction) {
+      editMember(selectedMemberForAction);
+    }
+  });
+
+  contextDeleteMember.addEventListener("click", () => {
+    if (selectedMemberForAction) {
+      deleteMember(selectedMemberForAction);
+    }
+  });
+
+  // Close context menu when clicking elsewhere
+  document.addEventListener("click", (event) => {
+    if (event.target !== memberContextMenu && !memberContextMenu.contains(event.target)) {
+      hideMemberContextMenu();
+    }
+  });
+
+  // Close context menu when pressing Escape
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      hideMemberContextMenu();
+    }
   });
 }
 
