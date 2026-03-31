@@ -6,11 +6,14 @@ const PRELOADED = window.PRELOADED_DATA || null;
 const fallbackColors = ["#2D6A4F", "#1D3557", "#8F2D56", "#CA6702", "#6A4C93", "#264653", "#386641", "#9D4EDD"];
 
 const defaultMembers = PRELOADED?.members || ["Open Seat"];
+// Default to only 'General' brand - no other brands by default
 const defaultBrands = ensureRequiredBrands(
-  (PRELOADED?.brands || [{ id: "b1", name: "General", color: "#2D6A4F" }]).map((brand, idx) => ({
-    ...brand,
-    color: brand.color === "#000000" ? fallbackColors[idx % fallbackColors.length] : brand.color
-  }))
+  (PRELOADED?.brands || [{ id: "b1", name: "General", color: "#2D6A4F" }])
+    .filter(brand => brand.name && brand.name.trim() !== '') // Only include non-empty brands
+    .map((brand, idx) => ({
+      ...brand,
+      color: brand.color === "#000000" ? fallbackColors[idx % fallbackColors.length] : brand.color
+    }))
 );
 
 const slots = buildSlots();
@@ -441,6 +444,26 @@ function saveState() {
   saveScheduleToSheets(state.assignments).catch(error => {
     console.error('Failed to sync to Google Sheets:', error);
   });
+}
+
+async function resetBrandsToGeneralOnly() {
+  try {
+    console.log('🔄 Resetting brands to General only...');
+    const response = await fetch('https://script.google.com/macros/d/AKfycbxaA1DTWe_5ecFbQO_J7F5Qvez7VB4D5lh2CxNDLVhRRnDgMGlqMGlvZG1Sm41m7Kg/usercontent?action=resetBrands');
+    const result = await response.json();
+    if (result.success) {
+      console.log('✓ Brands reset successfully');
+      showStatus('✓ Brands reset to General only!', 'success');
+      // Refresh the page after a short delay
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      console.error('Failed to reset brands:', result);
+      showStatus('Failed to reset brands', 'error');
+    }
+  } catch (error) {
+    console.error('Error resetting brands:', error);
+    showStatus('Error resetting brands. Check console.', 'error');
+  }
 }
 
 function renderPalette() {

@@ -11,6 +11,9 @@ function doGet(e) {
       return getBrandsData(sheet);
     } else if (action === 'getSchedule') {
       return getScheduleData(sheet);
+    } else if (action === 'resetBrands') {
+      resetBrandsToDefault(sheet);
+      return ContentService.createTextOutput(JSON.stringify({success: true, message: 'Brands reset to General only'})).setMimeType(ContentService.MimeType.JSON);
     }
     return ContentService.createTextOutput(JSON.stringify({error: 'Invalid action'})).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
@@ -75,13 +78,26 @@ function getBrandsData(spreadsheet) {
     const sheet = spreadsheet.getSheetByName('Brands');
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
-    const rows = data.slice(1).map(row => {
-      let obj = {};
-      headers.forEach((header, i) => {
-        obj[header] = row[i];
+    const rows = data.slice(1)
+      .filter(row => row[0] && row[0] !== '') // Filter out empty rows
+      .map(row => {
+        let obj = {};
+        headers.forEach((header, i) => {
+          obj[header] = row[i];
+        });
+        return obj;
       });
-      return obj;
-    });
+    
+    // If no brands or only empty rows, return default 'General' brand
+    if (rows.length === 0) {
+      return ContentService.createTextOutput(JSON.stringify([{
+        ID_BRANDS: 'b1',
+        NAME_BRANDS: 'General',
+        COLOR_BRANDS: '#2D6A4F',
+        ORDER_BRANDS: 1
+      }])).setMimeType(ContentService.MimeType.JSON);
+    }
+    
     return ContentService.createTextOutput(JSON.stringify(rows)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
@@ -195,6 +211,28 @@ function saveScheduleData(spreadsheet, scheduleData) {
     return true;
   } catch (error) {
     Logger.log('Error saving schedule: ' + error);
+    return false;
+  }
+}
+
+function resetBrandsToDefault(spreadsheet) {
+  try {
+    const brandsSheet = spreadsheet.getSheetByName('Brands');
+    if (!brandsSheet) return false;
+    
+    // Delete all rows except header
+    const lastRow = brandsSheet.getLastRow();
+    if (lastRow > 1) {
+      brandsSheet.deleteRows(2, lastRow - 1);
+    }
+    
+    // Add only 'General' brand
+    brandsSheet.appendRow(['b1', 'General', '#2D6A4F', 1]);
+    SpreadsheetApp.flush();
+    Logger.log('Brands reset to General only');
+    return true;
+  } catch (error) {
+    Logger.log('Error resetting brands: ' + error);
     return false;
   }
 }
