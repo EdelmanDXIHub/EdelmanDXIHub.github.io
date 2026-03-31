@@ -130,7 +130,7 @@ async function refreshFromSheet() {
       if (completeData.brands && Array.isArray(completeData.brands) && completeData.brands.length > 0) {
         const processedBrands = completeData.brands.map(b => ({
           id: b['ID_BRANDS'] || b.id || '',
-          name: b['BransName_BRAN...'] || b.name || '',
+          name: b['Name_BRANDS'] || b.name || '',
           color: b['Color_BRANDS'] || b.color || '#000000',
           order: b['ORDER_BRANDS'] || b.order || 0
         })).filter(b => b.id && b.name);
@@ -228,7 +228,7 @@ function init() {
     console.log('✓ Using brands from Google Sheets:', window.GOOGLE_SHEETS_BRANDS.length);
     const processedBrands = window.GOOGLE_SHEETS_BRANDS.map(b => ({
       id: b['ID_BRANDS'] || b.id || '',
-      name: b['BransName_BRAN...'] || b.name || '',
+      name: b['Name_BRANDS'] || b.name || '',
       color: b['Color_BRANDS'] || b.color || '#000000',
       order: b['ORDER_BRANDS'] || b.order || 0
     })).filter(b => b.id && b.name);
