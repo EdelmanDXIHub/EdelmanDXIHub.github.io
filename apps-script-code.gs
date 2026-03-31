@@ -5,7 +5,9 @@ function doGet(e) {
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID);
   
   try {
-    if (action === 'getMembers') {
+    if (action === 'debugSheets') {
+      return debugSheets(sheet);
+    } else if (action === 'getMembers') {
       return getSheetData(sheet, 'Team_Members', 'NAME_TEAM_MEMBERS');
     } else if (action === 'getBrands') {
       return getBrandsData(sheet);
@@ -243,5 +245,36 @@ function resetBrandsToDefault(spreadsheet) {
   } catch (error) {
     Logger.log('Error resetting brands: ' + error);
     return false;
+  }
+}
+
+function debugSheets(spreadsheet) {
+  try {
+    const debug = {
+      sheets: [],
+      message: 'Debug info for all sheets in the spreadsheet'
+    };
+    
+    const allSheets = spreadsheet.getSheets();
+    
+    for (const sheet of allSheets) {
+      const sheetName = sheet.getName();
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0] || [];
+      const rowCount = sheet.getLastRow() - 1; // Exclude header
+      
+      debug.sheets.push({
+        name: sheetName,
+        headers: headers,
+        rowCount: rowCount,
+        firstRows: data.slice(1, 6).map(row => Object.fromEntries(headers.map((h, i) => [h, row[i]])))
+      });
+    }
+    
+    Logger.log(JSON.stringify(debug, null, 2));
+    return ContentService.createTextOutput(JSON.stringify(debug)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    Logger.log('Error in debugSheets: ' + error);
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
 }
