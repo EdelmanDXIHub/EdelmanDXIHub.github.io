@@ -6,15 +6,13 @@ const PRELOADED = window.PRELOADED_DATA || null;
 const fallbackColors = ["#2D6A4F", "#1D3557", "#8F2D56", "#CA6702", "#6A4C93", "#264653", "#386641", "#9D4EDD"];
 
 const defaultMembers = PRELOADED?.members || ["Open Seat"];
-// Default to only 'General' brand - no other brands by default
-const defaultBrands = ensureRequiredBrands(
-  (PRELOADED?.brands || [{ id: "b1", name: "General", color: "#2D6A4F" }])
-    .filter(brand => brand.name && brand.name.trim() !== '') // Only include non-empty brands
-    .map((brand, idx) => ({
-      ...brand,
-      color: brand.color === "#000000" ? fallbackColors[idx % fallbackColors.length] : brand.color
-    }))
-);
+// No default brands - user must create brands manually
+const defaultBrands = (PRELOADED?.brands || [])
+  .filter(brand => brand.name && brand.name.trim() !== '') // Only include non-empty brands
+  .map((brand, idx) => ({
+    ...brand,
+    color: brand.color === "#000000" ? fallbackColors[idx % fallbackColors.length] : brand.color
+  }));
 
 const slots = buildSlots();
 const lunchSlots = new Set(slots.filter((s) => s.isLunch).map((s) => s.index));
@@ -304,12 +302,8 @@ function init() {
 }
 
 function ensureRequiredBrands(brands) {
-  const out = [...brands];
-  const hasLg2c = out.some((b) => b.name.toUpperCase().includes("LG2C"));
-  if (!hasLg2c) {
-    out.push({ id: `b_lg2c_${Date.now()}`, name: "LG2C (Monthly, Quaterly and Benchmark)", color: "#FF2600" });
-  }
-  return out;
+  // No automatic brands - user must create them manually
+  return [...brands];
 }
 
 function buildSlots() {

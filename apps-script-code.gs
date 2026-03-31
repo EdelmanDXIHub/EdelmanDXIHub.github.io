@@ -88,16 +88,7 @@ function getBrandsData(spreadsheet) {
         return obj;
       });
     
-    // If no brands or only empty rows, return default 'General' brand
-    if (rows.length === 0) {
-      return ContentService.createTextOutput(JSON.stringify([{
-        ID_BRANDS: 'b1',
-        NAME_BRANDS: 'General',
-        COLOR_BRANDS: '#2D6A4F',
-        ORDER_BRANDS: 1
-      }])).setMimeType(ContentService.MimeType.JSON);
-    }
-    
+    // Return brands as-is (empty array if no brands)
     return ContentService.createTextOutput(JSON.stringify(rows)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
@@ -226,10 +217,8 @@ function resetBrandsToDefault(spreadsheet) {
       brandsSheet.deleteRows(2, lastRow - 1);
     }
     
-    // Add only 'General' brand
-    brandsSheet.appendRow(['b1', 'General', '#2D6A4F', 1]);
     SpreadsheetApp.flush();
-    Logger.log('Brands reset to General only');
+    Logger.log('Brands cleared - no default brands');
     return true;
   } catch (error) {
     Logger.log('Error resetting brands: ' + error);
