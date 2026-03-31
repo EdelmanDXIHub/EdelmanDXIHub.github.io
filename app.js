@@ -434,10 +434,26 @@ function saveState() {
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   
-  // Also save to Google Sheets (async, non-blocking)
-  saveScheduleToSheets(state.assignments).catch(error => {
-    console.error('Failed to sync to Google Sheets:', error);
-  });
+  // Save to Google Sheets and refresh data
+  saveScheduleToSheets(state.assignments)
+    .then(success => {
+      if (success) {
+        console.log('✓ Schedule saved to Google Sheets, refreshing data...');
+        // Wait a moment for Google Sheets to process, then reload the data
+        setTimeout(() => {
+          loadCompleteDataFromSheets().then(() => {
+            renderTable();
+            renderTotals();
+            console.log('✓ Data refreshed from Google Sheets');
+          });
+        }, 500);
+      } else {
+        console.error('Failed to save to Google Sheets');
+      }
+    })
+    .catch(error => {
+      console.error('Failed to sync to Google Sheets:', error);
+    });
 }
 
 async function resetBrandsToGeneralOnly() {
