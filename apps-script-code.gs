@@ -1,6 +1,8 @@
+const SPREADSHEET_ID = '1zTHQuHZN3gBRPASAg2hn8CN0qBiC3cl-b1nqDglju4c';
+
 function doGet(e) {
   const action = e.parameter.action;
-  const sheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID);
   
   try {
     if (action === 'getMembers') {
@@ -19,7 +21,7 @@ function doGet(e) {
 function doPost(e) {
   const data = JSON.parse(e.postData.contents);
   const action = data.action;
-  const sheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID);
   
   try {
     if (action === 'addMember') {
@@ -113,7 +115,8 @@ function saveScheduleData(spreadsheet, scheduleData) {
     }
     const jsonString = JSON.stringify(scheduleData);
     sheet.getRange('A1').setValue(jsonString);
-    Logger.log('Schedule saved: ' + jsonString.substring(0, 100) + '...');
+    SpreadsheetApp.flush();
+    Logger.log('Schedule saved and flushed: ' + jsonString.substring(0, 100) + '...');
     return true;
   } catch (error) {
     Logger.log('Error saving schedule: ' + error);
