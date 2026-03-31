@@ -1,21 +1,18 @@
 const SPREADSHEET_ID = '1zTHQuHZN3gBRPASAg2hn8CN0qBiC3cl-b1nqDglju4c';
+const SHEET_NAME = 'Schedule';
 
 function doGet(e) {
   const action = e.parameter.action;
-  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID);
   
   try {
     if (action === 'debugSheets') {
-      return debugSheets(sheet);
+      return debugSheets();
     } else if (action === 'getMembers') {
-      return getSheetData(sheet, 'Team_Members', 'NAME_TEAM_MEMBERS');
+      return getMembers();
     } else if (action === 'getBrands') {
-      return getBrandsData(sheet);
+      return getBrands();
     } else if (action === 'getSchedule') {
-      return getScheduleData(sheet);
-    } else if (action === 'resetBrands') {
-      resetBrandsToDefault(sheet);
-      return ContentService.createTextOutput(JSON.stringify({success: true, message: 'Brands reset to General only'})).setMimeType(ContentService.MimeType.JSON);
+      return getSchedule();
     }
     return ContentService.createTextOutput(JSON.stringify({error: 'Invalid action'})).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
@@ -26,17 +23,10 @@ function doGet(e) {
 function doPost(e) {
   const data = JSON.parse(e.postData.contents);
   const action = data.action;
-  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID);
   
   try {
-    if (action === 'addMember') {
-      addRow(sheet, 'Team_Members', [data.name]);
-      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
-    } else if (action === 'addBrand') {
-      addRow(sheet, 'Brands', [data.id, data.name, data.color, data.order]);
-      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
-    } else if (action === 'saveSchedule') {
-      saveScheduleData(sheet, data.assignments);
+    if (action === 'saveSchedule') {
+      saveSchedule(data.schedule);
       return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
     }
     return ContentService.createTextOutput(JSON.stringify({error: 'Invalid action'})).setMimeType(ContentService.MimeType.JSON);
@@ -45,236 +35,123 @@ function doPost(e) {
   }
 }
 
-function getSheetData(spreadsheet, sheetName, columnFilter = null) {
+// ============= HELPER: Get JSON from cell A1 =============
+function getDataFromCell() {
   try {
-    const sheet = spreadsheet.getSheetByName(sheetName);
-    if (!sheet) {
-      Logger.log(`❌ ERROR: Sheet "${sheetName}" not found`);
-      Logger.log(`Available sheets: ${spreadsheet.getSheets().map(s => s.getName()).join(', ')}`);
-      return ContentService.createTextOutput(JSON.stringify({error: `Sheet "${sheetName}" not found`})).setMimeType(ContentService.MimeType.JSON);
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    const cellValue = sheet.getRange('A1').getValue();
+    
+    if (!cellValue || cellValue === '') {
+      Logger.log('⚠️ Cell A1 is empty');
+      return { members: [], brands: {}, schedule: {} };
     }
     
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    Logger.log(`📊 Sheet "${sheetName}" headers: ${headers.join(', ')}`);
-    
-    // If columnFilter is specified, return just the values from that column
-    if (columnFilter) {
-      const columnIndex = headers.indexOf(columnFilter);
-      if (columnIndex === -1) {
-        Logger.log(`❌ ERROR: Column "${columnFilter}" not found in "${sheetName}". Available: ${headers.join(', ')}`);
-        return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
-      }
-      const values = data.slice(1).map(row => row[columnIndex]).filter(v => v !== '');
-      Logger.log(`✓ Loaded ${values.length} values from "${sheetName}".${columnFilter}`);
-      return ContentService.createTextOutput(JSON.stringify(values)).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    // Otherwise return full objects
-    const rows = data.slice(1).map(row => {
-      let obj = {};
-      headers.forEach((header, i) => {
-        obj[header] = row[i];
-      });
-      return obj;
-    });
-    return ContentService.createTextOutput(JSON.stringify(rows)).setMimeType(ContentService.MimeType.JSON);
+    const parsed = JSON.parse(cellValue);
+    Logger.log('✓ Data loaded from cell A1');
+    return parsed;
   } catch (error) {
-    Logger.log(`❌ ERROR in getSheetData: ${error}`);
-    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+    Logger.log('❌ Error reading cell A1: ' + error);
+    return { members: [], brands: {}, schedule: {} };
   }
 }
 
-function getBrandsData(spreadsheet) {
+// ============= HELPER: Save JSON to cell A1 =============
+function saveDataToCell(data) {
   try {
-    const sheet = spreadsheet.getSheetByName('Brands');
-    if (!sheet) {
-      Logger.log(`❌ ERROR: Sheet "Brands" not found`);
-      Logger.log(`Available sheets: ${spreadsheet.getSheets().map(s => s.getName()).join(', ')}`);
-      return ContentService.createTextOutput(JSON.stringify({error: 'Brands sheet not found'})).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    Logger.log(`📊 Brands sheet headers: ${headers.join(', ')}`);
-    
-    const rows = data.slice(1)
-      .filter(row => row[0] && row[0] !== '') // Filter out empty rows
-      .map(row => {
-        let obj = {};
-        headers.forEach((header, i) => {
-          obj[header] = row[i];
-        });
-        return obj;
-      });
-    
-    Logger.log(`✓ Loaded ${rows.length} brands from Brands sheet`);
-    // Return brands as-is (empty array if no brands)
-    return ContentService.createTextOutput(JSON.stringify(rows)).setMimeType(ContentService.MimeType.JSON);
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    sheet.getRange('A1').setValue(JSON.stringify(data));
+    SpreadsheetApp.flush();
+    Logger.log('✓ Data saved to cell A1');
+    return true;
   } catch (error) {
-    Logger.log(`❌ ERROR in getBrandsData: ${error}`);
-    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+    Logger.log('❌ Error saving to cell A1: ' + error);
+    return false;
   }
 }
 
-function getScheduleData(spreadsheet) {
+// ============= GET MEMBERS =============
+function getMembers() {
   try {
-    const sheet = spreadsheet.getSheetByName('Schedule');
-    if (!sheet) {
-      return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
-    }
-    const cell = sheet.getRange('A1').getValue();
-    if (!cell || cell === '') {
-      return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
-    }
-    const parsed = JSON.parse(cell);
-    
-    // Create mapping of brand IDs to simplified names (b1, b2, b3, etc)
-    const brandsSheet = spreadsheet.getSheetByName('Brands');
-    const brandsData = brandsSheet.getDataRange().getValues();
-    const brandsHeaders = brandsData[0];
-    const idIndex = brandsHeaders.indexOf('ID_BRANDS');
-    
-    const brandMapping = {};
-    let brandCounter = 1;
-    for (let i = 1; i < brandsData.length; i++) {
-      const brandId = brandsData[i][idIndex];
-      if (brandId && brandId !== '') {
-        brandMapping[brandId] = 'b' + brandCounter;
-        brandCounter++;
-      }
-    }
-    
-    // Replace long brand IDs with simplified names in the schedule
-    const simplifiedSchedule = {};
-    for (const date in parsed) {
-      simplifiedSchedule[date] = {};
-      for (const member in parsed[date]) {
-        const assignments = parsed[date][member];
-        simplifiedSchedule[date][member] = assignments.map(assignment => {
-          if (assignment && brandMapping[assignment]) {
-            return brandMapping[assignment];
-          }
-          return assignment; // Keep LUNCH and null as-is
-        });
-      }
-    }
-    
-    return ContentService.createTextOutput(JSON.stringify(simplifiedSchedule)).setMimeType(ContentService.MimeType.JSON);
+    const data = getDataFromCell();
+    const members = data.members || [];
+    Logger.log('✓ Loaded ' + members.length + ' members');
+    return ContentService.createTextOutput(JSON.stringify(members)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
-    Logger.log('Error reading schedule: ' + error);
+    Logger.log('❌ Error in getMembers: ' + error);
+    return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ============= GET BRANDS =============
+function getBrands() {
+  try {
+    const data = getDataFromCell();
+    const brands = data.brands || {};
+    Logger.log('✓ Loaded ' + Object.keys(brands).length + ' brands');
+    return ContentService.createTextOutput(JSON.stringify(brands)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    Logger.log('❌ Error in getBrands: ' + error);
     return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-function addRow(spreadsheet, sheetName, values) {
+// ============= GET SCHEDULE =============
+function getSchedule() {
   try {
-    const sheet = spreadsheet.getSheetByName(sheetName);
-    sheet.appendRow(values);
+    const data = getDataFromCell();
+    const schedule = data.schedule || {};
+    Logger.log('✓ Loaded schedule with ' + Object.keys(schedule).length + ' days');
+    return ContentService.createTextOutput(JSON.stringify(schedule)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    Logger.log('❌ Error in getSchedule: ' + error);
+    return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ============= SAVE SCHEDULE =============
+function saveSchedule(newSchedule) {
+  try {
+    const data = getDataFromCell();
+    data.schedule = newSchedule;
+    saveDataToCell(data);
+    Logger.log('✓ Saved schedule with ' + Object.keys(newSchedule).length + ' days');
     return true;
   } catch (error) {
-    Logger.log('Error adding row: ' + error);
+    Logger.log('❌ Error in saveSchedule: ' + error);
     return false;
   }
 }
 
-function saveScheduleData(spreadsheet, scheduleData) {
+// ============= DEBUG: Show all sheet info =============
+function debugSheets() {
   try {
-    const sheet = spreadsheet.getSheetByName('Schedule');
-    if (!sheet) {
-      Logger.log('Schedule sheet not found');
-      return false;
-    }
+    const data = getDataFromCell();
     
-    // Create reverse mapping of simplified names (b1, b2, b3) to brand IDs
-    const brandsSheet = spreadsheet.getSheetByName('Brands');
-    const brandsData = brandsSheet.getDataRange().getValues();
-    const brandsHeaders = brandsData[0];
-    const idIndex = brandsHeaders.indexOf('ID_BRANDS');
-    
-    const brandMapping = {};
-    let brandCounter = 1;
-    for (let i = 1; i < brandsData.length; i++) {
-      const brandId = brandsData[i][idIndex];
-      if (brandId && brandId !== '') {
-        brandMapping['b' + brandCounter] = brandId;
-        brandCounter++;
+    const debugInfo = {
+      spreadsheet: 'AppTiming',
+      sheet: SHEET_NAME,
+      dataLocation: 'Cell A1 contains complete JSON',
+      members: {
+        count: data.members ? data.members.length : 0,
+        list: data.members ? data.members.slice(0, 5) : []
+      },
+      brands: {
+        count: data.brands ? Object.keys(data.brands).length : 0,
+        list: data.brands ? Object.keys(data.brands).slice(0, 5) : []
+      },
+      schedule: {
+        days: data.schedule ? Object.keys(data.schedule).length : 0,
+        firstDate: data.schedule ? Object.keys(data.schedule)[0] : null,
+        lastDate: data.schedule ? Object.keys(data.schedule)[Object.keys(data.schedule).length - 1] : null
       }
-    }
-    
-    // Convert simplified names back to long IDs before saving
-    const expandedSchedule = {};
-    for (const date in scheduleData) {
-      expandedSchedule[date] = {};
-      for (const member in scheduleData[date]) {
-        const assignments = scheduleData[date][member];
-        expandedSchedule[date][member] = assignments.map(assignment => {
-          if (assignment && brandMapping[assignment]) {
-            return brandMapping[assignment];
-          }
-          return assignment; // Keep LUNCH and null as-is
-        });
-      }
-    }
-    
-    const jsonString = JSON.stringify(expandedSchedule);
-    sheet.getRange('A1').setValue(jsonString);
-    SpreadsheetApp.flush();
-    Logger.log('Schedule saved and flushed: ' + jsonString.substring(0, 100) + '...');
-    return true;
-  } catch (error) {
-    Logger.log('Error saving schedule: ' + error);
-    return false;
-  }
-}
-
-function resetBrandsToDefault(spreadsheet) {
-  try {
-    const brandsSheet = spreadsheet.getSheetByName('Brands');
-    if (!brandsSheet) return false;
-    
-    // Delete all rows except header
-    const lastRow = brandsSheet.getLastRow();
-    if (lastRow > 1) {
-      brandsSheet.deleteRows(2, lastRow - 1);
-    }
-    
-    SpreadsheetApp.flush();
-    Logger.log('Brands cleared - no default brands');
-    return true;
-  } catch (error) {
-    Logger.log('Error resetting brands: ' + error);
-    return false;
-  }
-}
-
-function debugSheets(spreadsheet) {
-  try {
-    const debug = {
-      sheets: [],
-      message: 'Debug info for all sheets in the spreadsheet'
     };
     
-    const allSheets = spreadsheet.getSheets();
-    
-    for (const sheet of allSheets) {
-      const sheetName = sheet.getName();
-      const data = sheet.getDataRange().getValues();
-      const headers = data[0] || [];
-      const rowCount = sheet.getLastRow() - 1; // Exclude header
-      
-      debug.sheets.push({
-        name: sheetName,
-        headers: headers,
-        rowCount: rowCount,
-        firstRows: data.slice(1, 6).map(row => Object.fromEntries(headers.map((h, i) => [h, row[i]])))
-      });
-    }
-    
-    Logger.log(JSON.stringify(debug, null, 2));
-    return ContentService.createTextOutput(JSON.stringify(debug)).setMimeType(ContentService.MimeType.JSON);
+    Logger.log('🔍 DEBUG: ' + JSON.stringify(debugInfo, null, 2));
+    return ContentService.createTextOutput(JSON.stringify(debugInfo)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
-    Logger.log('Error in debugSheets: ' + error);
+    Logger.log('❌ Error in debugSheets: ' + error);
     return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
 }
