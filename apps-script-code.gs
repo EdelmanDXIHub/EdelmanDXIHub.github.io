@@ -45,10 +45,21 @@ function getSheetData(spreadsheet, sheetName, columnFilter = null) {
     const sheet = spreadsheet.getSheetByName(sheetName);
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
+    
+    // If columnFilter is specified, return just the values from that column
+    if (columnFilter) {
+      const columnIndex = headers.indexOf(columnFilter);
+      if (columnIndex === -1) {
+        return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
+      }
+      const values = data.slice(1).map(row => row[columnIndex]).filter(v => v !== '');
+      return ContentService.createTextOutput(JSON.stringify(values)).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // Otherwise return full objects
     const rows = data.slice(1).map(row => {
       let obj = {};
       headers.forEach((header, i) => {
-        if (columnFilter && header !== columnFilter) return;
         obj[header] = row[i];
       });
       return obj;
