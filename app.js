@@ -766,7 +766,8 @@ function attachEvents() {
       alert("Invalid color. Use format #RRGGBB");
       return;
     }
-    const id = `b${Date.now()}`;
+    // Generate simple brand ID: b1, b2, b3, etc based on count
+    const id = `b${state.brands.length + 1}`;
     const cleanColor = color.trim().toUpperCase();
     
     // Add to Google Sheets
