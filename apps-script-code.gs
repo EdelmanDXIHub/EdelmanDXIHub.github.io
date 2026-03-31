@@ -46,16 +46,25 @@ function doPost(e) {
 function getSheetData(spreadsheet, sheetName, columnFilter = null) {
   try {
     const sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      Logger.log(`❌ ERROR: Sheet "${sheetName}" not found`);
+      Logger.log(`Available sheets: ${spreadsheet.getSheets().map(s => s.getName()).join(', ')}`);
+      return ContentService.createTextOutput(JSON.stringify({error: `Sheet "${sheetName}" not found`})).setMimeType(ContentService.MimeType.JSON);
+    }
+    
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
+    Logger.log(`📊 Sheet "${sheetName}" headers: ${headers.join(', ')}`);
     
     // If columnFilter is specified, return just the values from that column
     if (columnFilter) {
       const columnIndex = headers.indexOf(columnFilter);
       if (columnIndex === -1) {
+        Logger.log(`❌ ERROR: Column "${columnFilter}" not found in "${sheetName}". Available: ${headers.join(', ')}`);
         return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
       }
       const values = data.slice(1).map(row => row[columnIndex]).filter(v => v !== '');
+      Logger.log(`✓ Loaded ${values.length} values from "${sheetName}".${columnFilter}`);
       return ContentService.createTextOutput(JSON.stringify(values)).setMimeType(ContentService.MimeType.JSON);
     }
     
@@ -69,6 +78,7 @@ function getSheetData(spreadsheet, sheetName, columnFilter = null) {
     });
     return ContentService.createTextOutput(JSON.stringify(rows)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
+    Logger.log(`❌ ERROR in getSheetData: ${error}`);
     return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
 }
@@ -76,8 +86,16 @@ function getSheetData(spreadsheet, sheetName, columnFilter = null) {
 function getBrandsData(spreadsheet) {
   try {
     const sheet = spreadsheet.getSheetByName('Brands');
+    if (!sheet) {
+      Logger.log(`❌ ERROR: Sheet "Brands" not found`);
+      Logger.log(`Available sheets: ${spreadsheet.getSheets().map(s => s.getName()).join(', ')}`);
+      return ContentService.createTextOutput(JSON.stringify({error: 'Brands sheet not found'})).setMimeType(ContentService.MimeType.JSON);
+    }
+    
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
+    Logger.log(`📊 Brands sheet headers: ${headers.join(', ')}`);
+    
     const rows = data.slice(1)
       .filter(row => row[0] && row[0] !== '') // Filter out empty rows
       .map(row => {
@@ -88,9 +106,11 @@ function getBrandsData(spreadsheet) {
         return obj;
       });
     
+    Logger.log(`✓ Loaded ${rows.length} brands from Brands sheet`);
     // Return brands as-is (empty array if no brands)
     return ContentService.createTextOutput(JSON.stringify(rows)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
+    Logger.log(`❌ ERROR in getBrandsData: ${error}`);
     return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
 }
