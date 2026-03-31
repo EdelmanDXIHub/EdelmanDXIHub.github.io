@@ -99,7 +99,39 @@ function getScheduleData(spreadsheet) {
       return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
     }
     const parsed = JSON.parse(cell);
-    return ContentService.createTextOutput(JSON.stringify(parsed)).setMimeType(ContentService.MimeType.JSON);
+    
+    // Create mapping of brand IDs to simplified names (b1, b2, b3, etc)
+    const brandsSheet = spreadsheet.getSheetByName('Brands');
+    const brandsData = brandsSheet.getDataRange().getValues();
+    const brandsHeaders = brandsData[0];
+    const idIndex = brandsHeaders.indexOf('ID_BRANDS');
+    
+    const brandMapping = {};
+    let brandCounter = 1;
+    for (let i = 1; i < brandsData.length; i++) {
+      const brandId = brandsData[i][idIndex];
+      if (brandId && brandId !== '') {
+        brandMapping[brandId] = 'b' + brandCounter;
+        brandCounter++;
+      }
+    }
+    
+    // Replace long brand IDs with simplified names in the schedule
+    const simplifiedSchedule = {};
+    for (const date in parsed) {
+      simplifiedSchedule[date] = {};
+      for (const member in parsed[date]) {
+        const assignments = parsed[date][member];
+        simplifiedSchedule[date][member] = assignments.map(assignment => {
+          if (assignment && brandMapping[assignment]) {
+            return brandMapping[assignment];
+          }
+          return assignment; // Keep LUNCH and null as-is
+        });
+      }
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify(simplifiedSchedule)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     Logger.log('Error reading schedule: ' + error);
     return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
@@ -124,7 +156,39 @@ function saveScheduleData(spreadsheet, scheduleData) {
       Logger.log('Schedule sheet not found');
       return false;
     }
-    const jsonString = JSON.stringify(scheduleData);
+    
+    // Create reverse mapping of simplified names (b1, b2, b3) to brand IDs
+    const brandsSheet = spreadsheet.getSheetByName('Brands');
+    const brandsData = brandsSheet.getDataRange().getValues();
+    const brandsHeaders = brandsData[0];
+    const idIndex = brandsHeaders.indexOf('ID_BRANDS');
+    
+    const brandMapping = {};
+    let brandCounter = 1;
+    for (let i = 1; i < brandsData.length; i++) {
+      const brandId = brandsData[i][idIndex];
+      if (brandId && brandId !== '') {
+        brandMapping['b' + brandCounter] = brandId;
+        brandCounter++;
+      }
+    }
+    
+    // Convert simplified names back to long IDs before saving
+    const expandedSchedule = {};
+    for (const date in scheduleData) {
+      expandedSchedule[date] = {};
+      for (const member in scheduleData[date]) {
+        const assignments = scheduleData[date][member];
+        expandedSchedule[date][member] = assignments.map(assignment => {
+          if (assignment && brandMapping[assignment]) {
+            return brandMapping[assignment];
+          }
+          return assignment; // Keep LUNCH and null as-is
+        });
+      }
+    }
+    
+    const jsonString = JSON.stringify(expandedSchedule);
     sheet.getRange('A1').setValue(jsonString);
     SpreadsheetApp.flush();
     Logger.log('Schedule saved and flushed: ' + jsonString.substring(0, 100) + '...');

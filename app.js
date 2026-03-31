@@ -18,6 +18,22 @@ const lunchSlots = new Set(slots.filter((s) => s.isLunch).map((s) => s.index));
 const weekdays = buildFebruaryWeekdays();
 const weeks = chunkWeekdays(weekdays, 5);
 
+// Map to store brand ID to simplified name mapping (b1, b2, b3, etc.)
+let brandIdToSimplified = {};
+let simplifiedToBrandId = {};
+
+// Function to create brand mapping from loaded brands
+function createBrandMapping(brands) {
+  brandIdToSimplified = {};
+  simplifiedToBrandId = {};
+  brands.forEach((brand, idx) => {
+    const simplifiedId = 'b' + (idx + 1);
+    brandIdToSimplified[brand.id] = simplifiedId;
+    simplifiedToBrandId[simplifiedId] = brand.id;
+  });
+  console.log('✓ Brand mapping created:', brandIdToSimplified);
+}
+
 // Will be initialized after Google Sheets loads
 let state;
 let selectedBrandId;
@@ -76,31 +92,82 @@ async function refreshFromSheet() {
   try {
     refreshFromSheetBtn.disabled = true;
     showLoading(true);
-    console.log('Manual refresh from Google Sheet initiated...');
+    console.log('🔄 Manual refresh from Google Sheet initiated...');
     
-    // Load fresh schedule from Google Sheets
-    const sheetsSchedule = await loadScheduleFromSheets();
+    // Load fresh complete data from Google Sheets
+    const completeData = await loadCompleteDataFromSheets();
     
-    if (sheetsSchedule && Object.keys(sheetsSchedule).length > 0) {
-      // Update state with fresh data
-      Object.assign(state.assignments, sheetsSchedule);
+    if (completeData && completeData.schedule !== null) {
+      console.log('✓ Complete data refreshed from Google Sheets');
+      
+      // Update members if changed
+      if (completeData.members && Array.isArray(completeData.members) && completeData.members.length > 0) {
+        const newMembers = completeData.members.map(m => m['NAME_TEAM_MEMBERS'] || m.name || m).filter(m => m && typeof m === 'string');
+        if (newMembers.length > 0 && JSON.stringify(newMembers) !== JSON.stringify(state.members)) {
+          console.log('Members updated:', newMembers.length);
+          state.members = newMembers;
+          
+          // Rebuild assignments with new members
+          const oldAssignments = state.assignments;
+          state.assignments = {};
+          for (const day of weekdays) {
+            state.assignments[day.key] = {};
+            for (const member of state.members) {
+              if (oldAssignments[day.key] && oldAssignments[day.key][member]) {
+                state.assignments[day.key][member] = oldAssignments[day.key][member];
+              } else {
+                state.assignments[day.key][member] = Array.from({ length: slots.length }, (_, i) => 
+                  lunchSlots.has(i) ? "LUNCH" : null
+                );
+              }
+            }
+          }
+        }
+      }
+      
+      // Update brands if changed
+      if (completeData.brands && Array.isArray(completeData.brands) && completeData.brands.length > 0) {
+        const processedBrands = completeData.brands.map(b => ({
+          id: b['ID_BRANDS'] || b.id || '',
+          name: b['BransName_BRAN...'] || b.name || '',
+          color: b['Color_BRANDS'] || b.color || '#000000',
+          order: b['ORDER_BRANDS'] || b.order || 0
+        })).filter(b => b.id && b.name);
+        
+        if (processedBrands.length > 0) {
+          const brandsWithOldIds = ensureRequiredBrands(processedBrands);
+          // Create brand mapping for data conversion
+          createBrandMapping(brandsWithOldIds);
+          // Simplify brand IDs
+          state.brands = brandsWithOldIds.map((brand, idx) => ({
+            ...brand,
+            id: 'b' + (idx + 1)
+          }));
+          console.log('✓ Brands updated and simplified:', state.brands.map(b => b.id).join(', '));
+        }
+      }
+      
+      // Update assignments
+      Object.assign(state.assignments, completeData.schedule);
+      
       saveState();
       
       // Re-render UI
+      renderPalette();
       renderTable();
       renderTotals();
       
       showLoading(false);
-      showStatus("Schedule synced from Google Sheet!", "success");
-      console.log('Refresh complete - schedule updated');
+      showStatus("✓ All data synced from Google Sheet!", "success");
+      console.log('✓ Refresh complete - all data updated');
     } else {
       showLoading(false);
-      showStatus("No data found in Google Sheet. Using local version.", "error");
+      showStatus("⚠ No data in Google Sheet. Using local version.", "error");
       console.warn('Google Sheet returned empty data');
     }
   } catch (error) {
     showLoading(false);
-    console.error('Error refreshing from sheet:', error);
+    console.error('💥 Error refreshing from sheet:', error);
     showStatus("Failed to sync. Check console for details.", "error");
   } finally {
     refreshFromSheetBtn.disabled = false;
@@ -110,20 +177,30 @@ async function refreshFromSheet() {
 async function initApp() {
   try {
     showLoading(true);
-    console.log('Starting app initialization...');
-    console.log('Loading LATEST schedule from Google Sheets...');
+    console.log('🚀 Starting app initialization...');
+    console.log('Loading COMPLETE data from Google Sheets (members, brands, schedule)...');
     
-    // Always load the LATEST schedule from Google Sheets (not local cache)
-    const sheetsSchedule = await loadScheduleFromSheets();
-    console.log('Google Sheets schedule loaded:', sheetsSchedule ? Object.keys(sheetsSchedule).length + ' days' : 'empty');
+    // Load all data from Google Sheets
+    const completeData = await loadCompleteDataFromSheets();
     
-    // Store schedule from Google Sheets for use in init()
-    window.GOOGLE_SHEETS_SCHEDULE = sheetsSchedule || null;
+    if (completeData && completeData.schedule !== null) {
+      console.log('✓ Complete synchronized data loaded from Google Sheets');
+      // Store data from Google Sheets for use in init()
+      window.GOOGLE_SHEETS_SCHEDULE = completeData.schedule || {};
+      window.GOOGLE_SHEETS_MEMBERS = completeData.members || [];
+      window.GOOGLE_SHEETS_BRANDS = completeData.brands || [];
+    } else {
+      console.warn('⚠ Google Sheets load failed, will use local data as fallback');
+      window.GOOGLE_SHEETS_SCHEDULE = null;
+      window.GOOGLE_SHEETS_MEMBERS = null;
+      window.GOOGLE_SHEETS_BRANDS = null;
+    }
     
   } catch (error) {
-    console.error('Error loading schedule from Google Sheets:', error);
-    console.log('Will use local/fallback schedule');
+    console.error('💥 Critical error loading data from Google Sheets:', error);
     window.GOOGLE_SHEETS_SCHEDULE = null;
+    window.GOOGLE_SHEETS_MEMBERS = null;
+    window.GOOGLE_SHEETS_BRANDS = null;
   } finally {
     showLoading(false);
   }
@@ -133,23 +210,81 @@ async function initApp() {
 }
 
 function init() {
-  console.log('Initializing UI with fresh data from Google Sheets...');
+  console.log('📋 Initializing UI with fresh data...');
   
-  // If we have fresh Google Sheets data, use it to rebuild state
-  if (window.GOOGLE_SHEETS_SCHEDULE) {
-    console.log('Syncing Google Sheets data into local state...');
+  // Determine members and brands to use
+  let syncedMembers = defaultMembers;
+  let syncedBrands = defaultBrands;
+  
+  // Use Google Sheets data if available
+  if (window.GOOGLE_SHEETS_MEMBERS && Array.isArray(window.GOOGLE_SHEETS_MEMBERS) && window.GOOGLE_SHEETS_MEMBERS.length > 0) {
+    console.log('✓ Using members from Google Sheets:', window.GOOGLE_SHEETS_MEMBERS.length);
+    const membersSet = new Set(window.GOOGLE_SHEETS_MEMBERS.map(m => m['NAME_TEAM_MEMBERS'] || m.name || m).filter(m => m && typeof m === 'string'));
+    syncedMembers = membersSet.size > 0 ? Array.from(membersSet) : defaultMembers;
+  }
+  
+  if (window.GOOGLE_SHEETS_BRANDS && Array.isArray(window.GOOGLE_SHEETS_BRANDS) && window.GOOGLE_SHEETS_BRANDS.length > 0) {
+    console.log('✓ Using brands from Google Sheets:', window.GOOGLE_SHEETS_BRANDS.length);
+    const processedBrands = window.GOOGLE_SHEETS_BRANDS.map(b => ({
+      id: b['ID_BRANDS'] || b.id || '',
+      name: b['BransName_BRAN...'] || b.name || '',
+      color: b['Color_BRANDS'] || b.color || '#000000',
+      order: b['ORDER_BRANDS'] || b.order || 0
+    })).filter(b => b.id && b.name);
     
-    // Create initial state structure
-    state = createInitialState();
+    if (processedBrands.length > 0) {
+      syncedBrands = ensureRequiredBrands(processedBrands);
+      // Create brand mapping (old ID -> b1, b2, b3, etc)
+      createBrandMapping(syncedBrands);
+      // Update brand IDs to simplified names
+      syncedBrands = syncedBrands.map((brand, idx) => ({
+        ...brand,
+        id: 'b' + (idx + 1)
+      }));
+      console.log('✓ Brands simplified to:', syncedBrands.map(b => b.id).join(', '));
+    }
+  }
+  
+  // If we have Google Sheets data, use it as source of truth
+  if (window.GOOGLE_SHEETS_SCHEDULE !== null) {
+    console.log('✓ Using schedule from Google Sheets as source of truth');
     
-    // Overlay Google Sheets assignments onto the state
-    Object.assign(state.assignments, window.GOOGLE_SHEETS_SCHEDULE);
+    // Create initial state structure with synced members and brands
+    state = {
+      members: syncedMembers,
+      brands: syncedBrands,
+      assignments: {},
+      selectedBrandId: syncedBrands[0]?.id || null
+    };
     
-    console.log('State updated with Google Sheets data');
+    // Initialize all assignments
+    for (const day of weekdays) {
+      state.assignments[day.key] = {};
+      for (const member of state.members) {
+        state.assignments[day.key][member] = Array.from({ length: slots.length }, (_, i) => 
+          lunchSlots.has(i) ? "LUNCH" : null
+        );
+      }
+    }
+    
+    // Overlay Google Sheets assignments
+    const sheetsData = window.GOOGLE_SHEETS_SCHEDULE || {};
+    for (const dayKey in sheetsData) {
+      if (state.assignments[dayKey]) {
+        Object.assign(state.assignments[dayKey], sheetsData[dayKey]);
+      }
+    }
+    
+    console.log('✓ State synced with Google Sheets data');
   } else {
-    // Fallback to local state if Google Sheets failed
-    state = loadState() || createInitialState();
-    console.log('📦 Using local state (Google Sheets unavailable)');
+    // Fallback to local state only if Google Sheets completely failed
+    console.warn('⚠ Google Sheets unavailable, falling back to local storage');
+    state = loadState() || {
+      members: syncedMembers,
+      brands: syncedBrands,
+      assignments: {},
+      selectedBrandId: syncedBrands[0]?.id || null
+    };
   }
   
   selectedBrandId = state.selectedBrandId || state.brands[0]?.id || null;
@@ -162,7 +297,7 @@ function init() {
   
   // Save the updated state locally for offline access
   saveState();
-  console.log('Local state saved');
+  console.log('✓ Local state saved');
 }
 
 function ensureRequiredBrands(brands) {
