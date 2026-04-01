@@ -6,43 +6,62 @@ const SHEET_NAME = "Schedule";
 let WEB_APP_URL = null;
 
 /**
- * Fetches data from Google Sheet via Apps Script endpoint (GET)
+ * Fetches data from Google Sheet via Apps Script endpoint (JSONP to avoid CORS)
  */
-async function loadDataFromSheet() {
-  try {
-    console.log("📡 Cargando datos del Google Sheet...");
-    
-    if (!WEB_APP_URL) {
-      throw new Error("Web App URL no configurada");
-    }
-    
-    const response = await fetch(`${WEB_APP_URL}?action=getData`);
-    
-    if (!response.ok) {
-      throw new Error(`Error HTTP: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    
-    if (result.success && result.data) {
-      // Update global PRELOADED_DATA
-      window.PRELOADED_DATA = result.data;
+function loadDataFromSheet() {
+  return new Promise((resolve) => {
+    try {
+      console.log("📡 Cargando datos del Google Sheet...");
       
-      console.log("✅ Datos cargados del Sheet:");
-      console.log(`   - Miembros: ${result.data.members?.length || 0}`);
-      console.log(`   - Marcas: ${result.data.brands?.length || 0}`);
-      console.log(`   - Asignaciones: ${Object.keys(result.data.assignments || {}).length} días`);
+      if (!WEB_APP_URL) {
+        throw new Error("Web App URL no configurada");
+      }
       
-      return true;
-    } else {
-      throw new Error(result.error || "Respuesta inválida");
+      // Use JSONP callback to bypass CORS
+      const callbackName = `jsonp_callback_${Date.now()}`;
+      window[callbackName] = function(response) {
+        delete window[callbackName];
+        
+        if (response.success && response.data) {
+          // Update global PRELOADED_DATA
+          window.PRELOADED_DATA = response.data;
+          
+          console.log("✅ Datos cargados del Sheet:");
+          console.log(`   - Miembros: ${response.data.members?.length || 0}`);
+          console.log(`   - Marcas: ${response.data.brands?.length || 0}`);
+          console.log(`   - Asignaciones: ${Object.keys(response.data.assignments || {}).length} días`);
+          
+          resolve(true);
+        } else {
+          throw new Error(response.error || "Respuesta inválida");
+        }
+      };
+      
+      const script = document.createElement('script');
+      script.src = `${WEB_APP_URL}?action=getData&callback=${callbackName}`;
+      script.onerror = () => {
+        console.error("❌ Error al cargar Script");
+        console.warn("⚠️  Usando datos locales de data.js como fallback");
+        resolve(false);
+      };
+      
+      document.head.appendChild(script);
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        if (window[callbackName]) {
+          console.warn("⚠️  Timeout al cargar datos del Sheet, usando fallback");
+          delete window[callbackName];
+          resolve(false);
+        }
+      }, 10000);
+      
+    } catch (error) {
+      console.error("❌ Error al cargar Sheet:", error.message);
+      console.warn("⚠️  Usando datos locales de data.js como fallback");
+      resolve(false);
     }
-    
-  } catch (error) {
-    console.error("❌ Error al cargar Sheet:", error.message);
-    console.warn("⚠️  Usando datos locales de data.js como fallback");
-    return false;
-  }
+  });
 }
 
 /**
