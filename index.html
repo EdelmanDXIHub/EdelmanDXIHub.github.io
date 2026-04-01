@@ -28,13 +28,8 @@
         <div class="toolbar">
           <button id="clearMonthBtn" type="button">Clear Full Month</button>
           <button id="addMemberBtn" type="button">Add Team Member</button>
-          <button id="refreshFromSheetBtn" type="button" title="Sync latest data from Google Sheet">🔄 Refresh Sheet</button>
           <button id="exportExcelBtn" type="button">Export Excel</button>
           <input id="templateFileInput" type="file" accept=".xlsx" hidden />
-        </div>
-
-        <div id="loadingIndicator" class="loading-indicator" style="display: none;">
-          <span class="spinner"></span> Syncing with Google Sheet...
         </div>
 
         <div class="table-wrap">
@@ -65,19 +60,15 @@
       </label>
     </template>
 
-    <!-- Context menu for member actions -->
-    <div id="memberContextMenu" class="context-menu" style="display: none;">
-      <button id="contextEditMember" class="context-menu-item">✏️ Edit Name</button>
-      <button id="contextDeleteMember" class="context-menu-item context-danger">🗑️ Delete Member</button>
-    </div>
-
-    <!-- Status message -->
-    <div id="statusMessage" class="status-message" style="display: none;"></div>
-
-    <script src="./data.js?v=5"></script>
-    <script src="./template-data.js?v=3"></script>
-    <script src="./google-sheets-api.js?v=3"></script>
+    <script src="./data.js?v=4"></script>
+    <script src="./sync-sheets.js"></script>
+    <script src="./template-data.js?v=2"></script>
     <script src="https://unpkg.com/xlsx-populate/browser/xlsx-populate.min.js"></script>
-    <script src="./app.js?v=26"></script>
+    <script src="./app.js?v=19"></script>
+    
+    <script>
+      // Configure Google Apps Script Web App URL for bidirectional sync
+      setWebAppURL("https://script.google.com/macros/s/AKfycbwSB42tXLxXM7Q91s673xYKNOtQl0aGvtUkkoqxJfwtHV7re6yrrZD5TZFngzlU1m8/exec");
+    </script>
   </body>
 </html>
