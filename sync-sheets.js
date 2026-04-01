@@ -1,22 +1,27 @@
-// Google Sheet Configuration
+// Google Sheets Configuration
 const SHEET_ID = "1fNhblv3Z1PgnvHL5OB3rFv5uJVWTr2g_HEaWCGQpui4";
 const SHEET_NAME = "Schedule";
+const SHEET_RANGE = "A1";
 
-// Proxy URL (Vercel) - REEMPLAZA con tu URL de Vercel
-let PROXY_URL = "https://apptiming-proxy.vercel.app/api";
+// Google Sheets API Key (reemplaza con tu key)
+let API_KEY = null;
+
+// Google Apps Script Web App URL
+let WEB_APP_URL = null;
 
 /**
- * Fetches data from Google Sheet via Vercel Proxy
+ * Fetches data from Google Sheet using Sheets API
  */
 async function loadDataFromSheet() {
   try {
     console.log("📡 Cargando datos del Google Sheet...");
     
-    if (!PROXY_URL) {
-      throw new Error("Proxy URL no configurada");
+    if (!API_KEY) {
+      throw new Error("API Key no configurada");
     }
     
-    const response = await fetch(`${PROXY_URL}/proxy?action=getData`);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!${SHEET_RANGE}?key=${API_KEY}`;
+    const response = await fetch(url);
     
     if (!response.ok) {
       throw new Error(`Error HTTP: ${response.status}`);
@@ -24,18 +29,21 @@ async function loadDataFromSheet() {
     
     const result = await response.json();
     
-    if (result.success && result.data) {
+    if (result.values && result.values[0] && result.values[0][0]) {
+      const jsonString = result.values[0][0];
+      const data = JSON.parse(jsonString);
+      
       // Update global PRELOADED_DATA
-      window.PRELOADED_DATA = result.data;
+      window.PRELOADED_DATA = data;
       
       console.log("✅ Datos cargados del Sheet:");
-      console.log(`   - Miembros: ${result.data.members?.length || 0}`);
-      console.log(`   - Marcas: ${result.data.brands?.length || 0}`);
-      console.log(`   - Asignaciones: ${Object.keys(result.data.assignments || {}).length} días`);
+      console.log(`   - Miembros: ${data.members?.length || 0}`);
+      console.log(`   - Marcas: ${data.brands?.length || 0}`);
+      console.log(`   - Asignaciones: ${Object.keys(data.assignments || {}).length} días`);
       
       return true;
     } else {
-      throw new Error(result.error || "Respuesta inválida");
+      throw new Error("Celda A1 vacía o sin datos válidos");
     }
     
   } catch (error) {
@@ -46,11 +54,11 @@ async function loadDataFromSheet() {
 }
 
 /**
- * Sends data to Google Sheet via Vercel Proxy
+ * Sends data to Google Sheet via Apps Script
  */
 async function syncDataToSheet(state) {
-  if (!PROXY_URL) {
-    console.warn("⚠️  Proxy URL no configurada. Datos no sincronizados.");
+  if (!WEB_APP_URL) {
+    console.warn("⚠️  Web App URL no configurada. Datos no sincronizados.");
     return false;
   }
 
@@ -63,7 +71,7 @@ async function syncDataToSheet(state) {
       assignments: state.assignments || {}
     };
 
-    const response = await fetch(`${PROXY_URL}/proxy`, {
+    const response = await fetch(WEB_APP_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -90,11 +98,12 @@ async function syncDataToSheet(state) {
 }
 
 /**
- * Configure the Proxy URL
+ * Configure the API Key and Web App URL
  */
-function setProxyURL(url) {
-  PROXY_URL = url;
-  console.log("✅ Proxy URL configurada:", url);
+function configureSheetSync(apiKey, webAppUrl) {
+  API_KEY = apiKey;
+  WEB_APP_URL = webAppUrl;
+  console.log("✅ Sincronización configurada");
 }
 
 /**

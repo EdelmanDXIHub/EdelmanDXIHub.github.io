@@ -67,8 +67,12 @@
     <script src="./app.js?v=19"></script>
     
     <script>
-      // Configure Vercel Proxy URL for Google Sheet sync
-      setProxyURL("https://apptiming-proxy.vercel.app/api");
+      // Configure Google Sheets sync
+      // REEMPLAZA TU_API_KEY con tu clave de Google Sheets
+      configureSheetSync(
+        "TU_API_KEY",
+        "https://script.google.com/macros/s/AKfycbwSB42tXLxXM7Q91s673xYKNOtQl0aGvtUkkoqxJfwtHV7re6yrrZD5TZFngzlU1m8/exec"
+      );
     </script>
   </body>
 </html>
