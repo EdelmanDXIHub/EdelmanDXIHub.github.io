@@ -2,75 +2,55 @@
 const SHEET_ID = "1fNhblv3Z1PgnvHL5OB3rFv5uJVWTr2g_HEaWCGQpui4";
 const SHEET_NAME = "Schedule";
 
-// Google Apps Script Web App URL (deployed as web app)
-let WEB_APP_URL = null;
+// Proxy URL (Vercel) - REEMPLAZA con tu URL de Vercel
+let PROXY_URL = "https://apptiming-proxy.vercel.app/api";
 
 /**
- * Fetches data from Google Sheet via Apps Script endpoint (JSONP to avoid CORS)
+ * Fetches data from Google Sheet via Vercel Proxy
  */
-function loadDataFromSheet() {
-  return new Promise((resolve) => {
-    try {
-      console.log("📡 Cargando datos del Google Sheet...");
-      
-      if (!WEB_APP_URL) {
-        throw new Error("Web App URL no configurada");
-      }
-      
-      // Use JSONP callback to bypass CORS
-      const callbackName = `jsonp_callback_${Date.now()}`;
-      window[callbackName] = function(response) {
-        delete window[callbackName];
-        
-        if (response.success && response.data) {
-          // Update global PRELOADED_DATA
-          window.PRELOADED_DATA = response.data;
-          
-          console.log("✅ Datos cargados del Sheet:");
-          console.log(`   - Miembros: ${response.data.members?.length || 0}`);
-          console.log(`   - Marcas: ${response.data.brands?.length || 0}`);
-          console.log(`   - Asignaciones: ${Object.keys(response.data.assignments || {}).length} días`);
-          
-          resolve(true);
-        } else {
-          throw new Error(response.error || "Respuesta inválida");
-        }
-      };
-      
-      const script = document.createElement('script');
-      script.src = `${WEB_APP_URL}?action=getData&callback=${callbackName}`;
-      script.onerror = () => {
-        console.error("❌ Error al cargar Script");
-        console.warn("⚠️  Usando datos locales de data.js como fallback");
-        resolve(false);
-      };
-      
-      document.head.appendChild(script);
-      
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        if (window[callbackName]) {
-          console.warn("⚠️  Timeout al cargar datos del Sheet, usando fallback");
-          delete window[callbackName];
-          resolve(false);
-        }
-      }, 10000);
-      
-    } catch (error) {
-      console.error("❌ Error al cargar Sheet:", error.message);
-      console.warn("⚠️  Usando datos locales de data.js como fallback");
-      resolve(false);
+async function loadDataFromSheet() {
+  try {
+    console.log("📡 Cargando datos del Google Sheet...");
+    
+    if (!PROXY_URL) {
+      throw new Error("Proxy URL no configurada");
     }
-  });
+    
+    const response = await fetch(`${PROXY_URL}/proxy?action=getData`);
+    
+    if (!response.ok) {
+      throw new Error(`Error HTTP: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.success && result.data) {
+      // Update global PRELOADED_DATA
+      window.PRELOADED_DATA = result.data;
+      
+      console.log("✅ Datos cargados del Sheet:");
+      console.log(`   - Miembros: ${result.data.members?.length || 0}`);
+      console.log(`   - Marcas: ${result.data.brands?.length || 0}`);
+      console.log(`   - Asignaciones: ${Object.keys(result.data.assignments || {}).length} días`);
+      
+      return true;
+    } else {
+      throw new Error(result.error || "Respuesta inválida");
+    }
+    
+  } catch (error) {
+    console.error("❌ Error al cargar Sheet:", error.message);
+    console.warn("⚠️  Usando datos locales de data.js como fallback");
+    return false;
+  }
 }
 
 /**
- * Sends data to Google Sheet via Apps Script Web App (POST)
+ * Sends data to Google Sheet via Vercel Proxy
  */
 async function syncDataToSheet(state) {
-  // Only sync if we have the Web App URL configured
-  if (!WEB_APP_URL) {
-    console.warn("⚠️  Web App URL no configurada. Datos no sincronizados.");
+  if (!PROXY_URL) {
+    console.warn("⚠️  Proxy URL no configurada. Datos no sincronizados.");
     return false;
   }
 
@@ -83,7 +63,7 @@ async function syncDataToSheet(state) {
       assignments: state.assignments || {}
     };
 
-    const response = await fetch(WEB_APP_URL, {
+    const response = await fetch(`${PROXY_URL}/proxy`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -110,11 +90,11 @@ async function syncDataToSheet(state) {
 }
 
 /**
- * Configure the Web App URL (set this after deploying Google Apps Script)
+ * Configure the Proxy URL
  */
-function setWebAppURL(url) {
-  WEB_APP_URL = url;
-  console.log("✅ Web App URL configurada:", url);
+function setProxyURL(url) {
+  PROXY_URL = url;
+  console.log("✅ Proxy URL configurada:", url);
 }
 
 /**
@@ -124,7 +104,6 @@ async function initializeApp() {
   // Try to load from Sheet first
   const sheetLoaded = await loadDataFromSheet();
   
-  // If Sheet load failed, data.js will provide the fallback via window.PRELOADED_DATA
   // Initialize the main app (from app.js)
   if (typeof init === "function") {
     init();
