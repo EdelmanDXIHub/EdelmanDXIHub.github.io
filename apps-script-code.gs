@@ -4,39 +4,64 @@
 
 function doGet(e) {
   try {
-    const action = e.parameter.action || "getData";
+    // Handle case when run without parameters in Apps Script editor
+    if (!e) {
+      e = { parameter: {} };
+    }
+    
+    const action = e.parameter?.action || "getData";
+    const callback = e.parameter?.callback;
     
     if (action === "getData") {
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Schedule");
       const jsonString = sheet.getRange("A1").getValue();
       
+      let response;
+      
       if (!jsonString) {
-        return ContentService.createTextOutput(JSON.stringify({
+        response = {
           success: false,
           error: "Celda A1 vacía"
-        })).setMimeType(ContentService.MimeType.JSON);
+        };
+      } else {
+        try {
+          const data = JSON.parse(jsonString);
+          response = {
+            success: true,
+            data: data
+          };
+        } catch (parseError) {
+          response = {
+            success: false,
+            error: "JSON inválido en A1"
+          };
+        }
       }
       
-      try {
-        const data = JSON.parse(jsonString);
-        return ContentService.createTextOutput(JSON.stringify({
-          success: true,
-          data: data
-        })).setMimeType(ContentService.MimeType.JSON);
-      } catch (parseError) {
-        return ContentService.createTextOutput(JSON.stringify({
-          success: false,
-          error: "JSON inválido en A1",
-          raw: jsonString.substring(0, 100)
-        })).setMimeType(ContentService.MimeType.JSON);
+      // Return JSONP if callback is provided
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + JSON.stringify(response) + ')')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
       }
+      
+      // Otherwise return JSON
+      return ContentService.createTextOutput(JSON.stringify(response))
+        .setMimeType(ContentService.MimeType.JSON);
     }
     
   } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({
+    const response = {
       success: false,
       error: error.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
+    };
+    
+    if (e && e.parameter?.callback) {
+      return ContentService.createTextOutput(e.parameter.callback + '(' + JSON.stringify(response) + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify(response))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
@@ -67,7 +92,6 @@ function doPost(e) {
 }
 
 function putDataInA1() {
-  // Fallback function to manually sync (optional)
   const data = {
     "members": [
       "DXI Hub Weekly Timing Map",
