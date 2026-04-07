@@ -1,6 +1,15 @@
 const SPREADSHEET_ID = '1zTHQuHZN3gBRPASAg2hn8CN0qBiC3cl-b1nqDglju4c';
 const SHEET_NAME = 'assignments';
 
+// Handle CORS preflight requests
+function doOptions(e) {
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT)
+    .addHeader('Access-Control-Allow-Origin', '*')
+    .addHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .addHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 function doGet(e) {
   const action = e.parameter.action;
   
@@ -16,9 +25,11 @@ function doGet(e) {
     } else if (action === 'getSchedule') {
       return getSchedule();
     }
-    return ContentService.createTextOutput(JSON.stringify({error: 'Invalid action'})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({error: 'Invalid action'})).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*');
   } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*');
   }
 }
 
@@ -52,7 +63,10 @@ function doPost(e) {
         const currentData = getDataFromCell();
         currentData.assignments = data.data.assignments;
         saveDataToCell(currentData);
-        return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+        return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON)
+          .addHeader('Access-Control-Allow-Origin', '*')
+          .addHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+          .addHeader('Access-Control-Allow-Headers', 'Content-Type');
       }
     } else if (action === 'saveSchedule') {
       if (data.data) {
@@ -60,12 +74,21 @@ function doPost(e) {
       } else {
         saveSchedule(data.assignments);
       }
-      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON)
+        .addHeader('Access-Control-Allow-Origin', '*')
+        .addHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        .addHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
-    return ContentService.createTextOutput(JSON.stringify({error: 'Invalid action'})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({error: 'Invalid action'})).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*')
+      .addHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+      .addHeader('Access-Control-Allow-Headers', 'Content-Type');
   } catch (error) {
     Logger.log('❌ Error in doPost: ' + error.toString());
-    return ContentService.createTextOutput(JSON.stringify({success: false, error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({success: false, error: error.toString()})).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*')
+      .addHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+      .addHeader('Access-Control-Allow-Headers', 'Content-Type');
   }
 }
 
@@ -118,10 +141,12 @@ function getMembers() {
     const data = getDataFromCell();
     const members = data.members || [];
     Logger.log('✓ Loaded ' + members.length + ' members');
-    return ContentService.createTextOutput(JSON.stringify(members)).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify(members)).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*');
   } catch (error) {
     Logger.log('❌ Error in getMembers: ' + error);
-    return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*');
   }
 }
 
@@ -131,10 +156,12 @@ function getBrands() {
     const data = getDataFromCell();
     const brands = data.brands || {};
     Logger.log('✓ Loaded ' + Object.keys(brands).length + ' brands');
-    return ContentService.createTextOutput(JSON.stringify(brands)).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify(brands)).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*');
   } catch (error) {
     Logger.log('❌ Error in getBrands: ' + error);
-    return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*');
   }
 }
 
@@ -144,10 +171,12 @@ function getSchedule() {
     const data = getDataFromCell();
     const schedule = data.assignments || {};
     Logger.log('✓ Loaded schedule with ' + Object.keys(schedule).length + ' days');
-    return ContentService.createTextOutput(JSON.stringify(schedule)).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify(schedule)).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*');
   } catch (error) {
     Logger.log('❌ Error in getSchedule: ' + error);
-    return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*');
   }
 }
 
@@ -212,10 +241,12 @@ function debugSheets() {
     };
     
     Logger.log('🔍 DEBUG: ' + JSON.stringify(debugInfo, null, 2));
-    return ContentService.createTextOutput(JSON.stringify(debugInfo)).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify(debugInfo)).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*');
   } catch (error) {
     Logger.log('❌ Error in debugSheets: ' + error);
-    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*');
   }
 }
 
@@ -230,9 +261,11 @@ function initializeData() {
     
     saveDataToCell(initialData);
     Logger.log('✓ Data initialized in cell A1');
-    return ContentService.createTextOutput(JSON.stringify({success: true, message: 'Data initialized'})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({success: true, message: 'Data initialized'})).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*');
   } catch (error) {
     Logger.log('❌ Error initializing data: ' + error);
-    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON)
+      .addHeader('Access-Control-Allow-Origin', '*');
   }
 }
