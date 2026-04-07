@@ -3,7 +3,7 @@ const SHEET_ID = "1zTHQuHZN3gBRPASAg2hn8CN0qBiC3cl-b1nqDglju4c";
 const SHEET_NAME = "assignments";
 const SHEET_RANGE = "A1";
 
-// Google Sheets API Key (reemplaza con tu key)
+// Google Sheets API Key
 let API_KEY = null;
 
 // Google Apps Script Web App URL
@@ -11,6 +11,7 @@ let WEB_APP_URL = null;
 
 /**
  * Fetches data from Google Sheet using Sheets API
+ * ALWAYS uses Sheet data — never falls back to data.js
  */
 async function loadDataFromSheet() {
   try {
@@ -29,64 +30,62 @@ async function loadDataFromSheet() {
     
     const result = await response.json();
     
+    // Always use members/brands from data.js (those are the source of truth for structure)
+    const members = window.PRELOADED_DATA?.members || [];
+    const brands = window.PRELOADED_DATA?.brands || [];
+    
+    let assignments = {};
+    
     if (result.values && result.values[0] && result.values[0][0]) {
       const jsonString = result.values[0][0];
       const sheetData = JSON.parse(jsonString);
-      
-      // Merge: keep members/brands from local data, use assignments from Sheet
-      const mergedData = {
-        members: window.PRELOADED_DATA?.members || [],
-        brands: window.PRELOADED_DATA?.brands || [],
-        assignments: sheetData.assignments || sheetData // Handle both full object and assignments-only
-      };
-      
-      // Update global PRELOADED_DATA with merged data
-      window.PRELOADED_DATA = mergedData;
-      
-      console.log("✅ Datos cargados del Sheet:");
-      console.log(`   - Miembros: ${mergedData.members?.length || 0}`);
-      console.log(`   - Marcas: ${mergedData.brands?.length || 0}`);
-      console.log(`   - Asignaciones: ${Object.keys(mergedData.assignments || {}).length} días`);
-      
-      return true;
+      assignments = sheetData.assignments || sheetData;
+      console.log("✅ Asignaciones cargadas del Sheet: " + Object.keys(assignments).length + " días");
     } else {
-      throw new Error("Celda A1 vacía o sin datos válidos");
+      console.warn("⚠️ Celda A1 vacía — se inicializará con datos en blanco");
     }
+
+    const mergedData = { members, brands, assignments };
+    window.PRELOADED_DATA = mergedData;
+    
+    console.log(`   - Miembros: ${members.length}`);
+    console.log(`   - Marcas: ${brands.length}`);
+    
+    return true;
     
   } catch (error) {
     console.error("❌ Error al cargar Sheet:", error.message);
-    console.warn("⚠️  Usando datos locales de data.js como fallback");
+    // Still use members/brands from data.js but assignments stay empty
+    const members = window.PRELOADED_DATA?.members || [];
+    const brands = window.PRELOADED_DATA?.brands || [];
+    window.PRELOADED_DATA = { members, brands, assignments: {} };
+    console.warn("⚠️ Usando miembros/marcas locales, asignaciones vacías (Sheet no disponible)");
     return false;
   }
 }
 
 /**
- * Sends changed days to Google Sheet via GET requests (bypasses CORS+302 redirect)
- * GET requests survive 302 redirects because data is in the URL, not the body
+ * Sends a day to Google Sheet via fetch GET (GET survives 302 redirects)
  */
 let _pendingDays = new Set();
 let _syncTimer = null;
 
 function syncDataToSheet(state, changedDay) {
   if (!WEB_APP_URL) {
-    console.warn("⚠️  Web App URL no configurada. Datos no sincronizados.");
+    console.warn("⚠️  Web App URL no configurada.");
     return false;
   }
 
-  // Track which day(s) need syncing
   if (changedDay) {
     _pendingDays.add(changedDay);
   } else {
-    // No specific day = sync everything (e.g. clear month, add member)
     for (const day of Object.keys(state.assignments || {})) {
       _pendingDays.add(day);
     }
   }
 
-  // Debounce: wait 2 seconds after last change before syncing
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(() => _flushPendingDays(state), 2000);
-
   return true;
 }
 
@@ -98,36 +97,56 @@ async function _flushPendingDays(state) {
   console.log("🔄 Sincronizando " + days.length + " día(s) al Sheet...");
 
   let success = 0;
+  let lastError = null;
   for (const day of days) {
     const dayData = state.assignments[day];
     if (dayData) {
-      const ok = await _sendDayViaGet(day, dayData);
-      if (ok) success++;
+      const result = await _sendDayViaGet(day, dayData);
+      if (result.ok) {
+        success++;
+      } else {
+        lastError = result.error;
+      }
     }
   }
 
-  console.log("✅ " + success + "/" + days.length + " día(s) sincronizados");
+  if (success === days.length) {
+    console.log("✅ " + success + "/" + days.length + " día(s) sincronizados");
+  } else {
+    console.error("⚠️ " + success + "/" + days.length + " días OK. Error: " + lastError);
+  }
 }
 
-function _sendDayViaGet(dayKey, dayData) {
-  return new Promise((resolve) => {
+async function _sendDayViaGet(dayKey, dayData) {
+  try {
     const url = WEB_APP_URL
       + "?action=saveDay"
       + "&day=" + encodeURIComponent(dayKey)
-      + "&data=" + encodeURIComponent(JSON.stringify(dayData))
-      + "&t=" + Date.now();
+      + "&data=" + encodeURIComponent(JSON.stringify(dayData));
 
-    // Image GET request: not subject to CORS, survives 302 redirects
-    const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(true); // onerror expected (server returns JSON, not image)
-    img.src = url;
-
-    setTimeout(() => resolve(false), 15000);
-  });
+    const response = await fetch(url);
+    const text = await response.text();
+    
+    try {
+      const json = JSON.parse(text);
+      if (json.success) {
+        return { ok: true };
+      } else {
+        console.error("❌ Sheet respondió error para " + dayKey + ":", json.error || text);
+        return { ok: false, error: json.error || "Unknown error" };
+      }
+    } catch {
+      // If response isn't JSON, log it
+      console.error("❌ Respuesta no-JSON para " + dayKey + ":", text.substring(0, 200));
+      return { ok: false, error: "Non-JSON response" };
+    }
+  } catch (error) {
+    console.error("❌ Fetch falló para " + dayKey + ":", error.message);
+    return { ok: false, error: error.message };
+  }
 }
 
-// Full sync: push ALL current days to Sheet (call from console for manual sync)
+// Full sync: push ALL current days to Sheet
 async function fullSyncToSheet() {
   if (!WEB_APP_URL) {
     console.error("❌ Web App URL no configurada");
@@ -146,14 +165,18 @@ async function fullSyncToSheet() {
 
   let success = 0;
   for (const day of days) {
-    const ok = await _sendDayViaGet(day, assignments[day]);
-    if (ok) success++;
-    // Small delay between requests
+    const result = await _sendDayViaGet(day, assignments[day]);
+    if (result.ok) {
+      success++;
+      console.log("  ✓ " + day);
+    } else {
+      console.error("  ✗ " + day + ": " + result.error);
+    }
     await new Promise(r => setTimeout(r, 500));
   }
 
-  console.log("✅ Full sync completo: " + success + "/" + days.length + " días");
-  return true;
+  console.log("✅ Full sync: " + success + "/" + days.length + " días");
+  return success === days.length;
 }
 
 /**
@@ -169,13 +192,11 @@ function configureSheetSync(apiKey, webAppUrl) {
 }
 
 /**
- * Initialize the app - fetch sheet data first, then run main app
+ * Initialize the app - always loads from Sheet first
  */
 async function initializeApp() {
-  // Try to load from Sheet first
-  const sheetLoaded = await loadDataFromSheet();
+  await loadDataFromSheet();
   
-  // Initialize the main app (from app.js)
   if (typeof init === "function") {
     init();
   }
