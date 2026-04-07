@@ -588,14 +588,16 @@ async function exportScheduleToNewExcel() {
     // Column headers
     sheet.cell("A4").value("Team Member").style("bold", true).style("fill", "D3D3D3");
     sheet.cell("B4").value("Date").style("bold", true).style("fill", "D3D3D3");
-    sheet.cell("C4").value("Time Slot").style("bold", true).style("fill", "D3D3D3");
-    sheet.cell("D4").value("Brand Assigned").style("bold", true).style("fill", "D3D3D3");
+    sheet.cell("C4").value("Time Range").style("bold", true).style("fill", "D3D3D3");
+    sheet.cell("D4").value("Hours").style("bold", true).style("fill", "D3D3D3");
+    sheet.cell("E4").value("Brand Assigned").style("bold", true).style("fill", "D3D3D3");
 
     // Set column widths
     sheet.column("A").width(25);
     sheet.column("B").width(15);
-    sheet.column("C").width(20);
-    sheet.column("D").width(30);
+    sheet.column("C").width(22);
+    sheet.column("D").width(8);
+    sheet.column("E").width(35);
 
     let rowNum = 5;
     const brandById = new Map(state.brands.map((b) => [b.id, b]));
@@ -607,30 +609,45 @@ async function exportScheduleToNewExcel() {
         const dayKey = weekday.key;
         const assignments = state.assignments[dayKey]?.[member] || [];
 
-        // Iterate through each slot
+        // Build consecutive ranges of the same brand
+        const ranges = [];
+        let current = null;
         for (let slotIdx = 0; slotIdx < slots.length; slotIdx++) {
-          const slot = slots[slotIdx];
           const brandId = assignments[slotIdx];
+          if (brandId === "LUNCH" || !brandId) {
+            if (current) { ranges.push(current); current = null; }
+            continue;
+          }
+          if (current && current.brandId === brandId) {
+            current.endIdx = slotIdx;
+          } else {
+            if (current) ranges.push(current);
+            current = { brandId, startIdx: slotIdx, endIdx: slotIdx };
+          }
+        }
+        if (current) ranges.push(current);
 
-          // Skip lunch slots
-          if (brandId === "LUNCH") continue;
-
-          // Skip empty slots only if we're not on every row (optional: comment out to show all slots)
-          if (!brandId) continue;
-
-          const brand = brandId ? brandById.get(brandId) : null;
+        for (const range of ranges) {
+          const startSlot = slots[range.startIdx];
+          // End label = start of next slot (i.e. +30 min from endIdx)
+          const endMinTotal = slots[range.endIdx].hour * 60 + slots[range.endIdx].minute + 30;
+          const endHour = Math.floor(endMinTotal / 60);
+          const endMin = endMinTotal % 60;
+          const endLabel = toLabel(endHour, endMin);
+          const hours = ((range.endIdx - range.startIdx + 1) * 0.5).toFixed(1);
+          const brand = brandById.get(range.brandId);
           const brandName = brand ? brand.name : "";
 
           sheet.cell(`A${rowNum}`).value(member);
           sheet.cell(`B${rowNum}`).value(weekday.label);
-          sheet.cell(`C${rowNum}`).value(slot.label);
-          sheet.cell(`D${rowNum}`).value(brandName);
+          sheet.cell(`C${rowNum}`).value(`${startSlot.label} – ${endLabel}`);
+          sheet.cell(`D${rowNum}`).value(Number(hours));
+          sheet.cell(`E${rowNum}`).value(brandName);
 
-          // Apply color from brand if exists
           if (brand) {
-            const cellD = sheet.cell(`D${rowNum}`);
-            applyFillColor(cellD, brand.color);
-            cellD.style("fontColor", "000000");
+            const cellE = sheet.cell(`E${rowNum}`);
+            applyFillColor(cellE, brand.color);
+            cellE.style("fontColor", "000000");
           }
 
           rowNum++;
