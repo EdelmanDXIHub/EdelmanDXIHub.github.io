@@ -35,7 +35,7 @@ const lunchSlots = new Set(slots.filter((s) => s.isLunch).map((s) => s.index));
 const allWeekdays = MONTHS.flatMap((m) => buildMonthWeekdays(m.year, m.month));
 
 // Current month's weekdays (recalculated on tab switch)
-let weekdays = buildMonthWeekdays(MONTHS[0].year, MONTHS[0].month);
+let weekdays = buildMonthWeekdays(MONTHS[currentMonthIdx].year, MONTHS[currentMonthIdx].month);
 let weeks = chunkWeekdays(weekdays, 5);
 
 const state = loadState() || createInitialState();
