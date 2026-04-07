@@ -143,6 +143,22 @@ function buildSlots() {
 
 function buildMonthWeekdays(year, month) {
   const out = [];
+  const firstOfMonth = new Date(year, month, 1);
+  const firstDow = firstOfMonth.getDay(); // 0=Sun, 1=Mon, ...
+
+  // If month doesn't start on Monday, pad with previous month's weekdays
+  // so the first displayed week starts on Monday
+  if (firstDow !== 1 && firstDow !== 0) {
+    // How many weekdays to go back to reach Monday
+    const daysBack = firstDow - 1; // e.g. Wed(3) → 2 days back
+    for (let i = daysBack; i >= 1; i -= 1) {
+      const date = new Date(year, month, 1 - i);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      out.push({ key, day: date.getDate(), label: `${date.toLocaleDateString("en-US", { weekday: "short" })} ${date.getDate()}` });
+    }
+  }
+
+  // Add all weekdays of the actual month
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   for (let day = 1; day <= daysInMonth; day += 1) {
     const date = new Date(year, month, day);
@@ -151,6 +167,20 @@ function buildMonthWeekdays(year, month) {
     const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     out.push({ key, day, label: `${date.toLocaleDateString("en-US", { weekday: "short" })} ${day}` });
   }
+
+  // If the last day of the month doesn't fall on Friday, pad with next month's weekdays
+  const lastDate = new Date(year, month, daysInMonth);
+  const lastDow = lastDate.getDay();
+  if (lastDow !== 5 && lastDow !== 6 && lastDow !== 0) {
+    const daysForward = 5 - lastDow; // e.g. Wed(3) → 2 more days to reach Fri
+    for (let i = 1; i <= daysForward; i += 1) {
+      const date = new Date(year, month, daysInMonth + i);
+      if (date.getDay() === 0 || date.getDay() === 6) continue;
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      out.push({ key, day: date.getDate(), label: `${date.toLocaleDateString("en-US", { weekday: "short" })} ${date.getDate()}` });
+    }
+  }
+
   return out;
 }
 
