@@ -34,6 +34,7 @@ let memberTotals;
 let eraserBtn;
 let clearMonthBtn;
 let addMemberBtn;
+let removeMemberBtn;
 let addBrandBtn;
 let exportExcelBtn;
 let templateFileInput;
@@ -52,6 +53,7 @@ function init() {
   eraserBtn = document.getElementById("eraserBtn");
   clearMonthBtn = document.getElementById("clearMonthBtn");
   addMemberBtn = document.getElementById("addMemberBtn");
+  removeMemberBtn = document.getElementById("removeMemberBtn");
   addBrandBtn = document.getElementById("addBrandBtn");
   exportExcelBtn = document.getElementById("exportExcelBtn");
   templateFileInput = document.getElementById("templateFileInput");
@@ -366,6 +368,30 @@ function attachEvents() {
     }
     state.members.push(clean);
     for (const day of weekdays) state.assignments[day.key][clean] = slots.map((slot) => (slot.isLunch ? "LUNCH" : null));
+    renderTable();
+    renderTotals();
+    saveState();
+  });
+
+  removeMemberBtn.addEventListener("click", () => {
+    if (state.members.length === 0) {
+      alert("No team members to remove.");
+      return;
+    }
+    const list = state.members.map((m, i) => `${i + 1}. ${m}`).join("\n");
+    const input = prompt("Enter the number of the member to remove:\n\n" + list);
+    if (!input) return;
+    const idx = parseInt(input, 10) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= state.members.length) {
+      alert("Invalid selection.");
+      return;
+    }
+    const memberName = state.members[idx];
+    if (!confirm(`Remove "${memberName}" and all their assignments?`)) return;
+    state.members.splice(idx, 1);
+    for (const day of weekdays) {
+      delete state.assignments[day.key][memberName];
+    }
     renderTable();
     renderTotals();
     saveState();
