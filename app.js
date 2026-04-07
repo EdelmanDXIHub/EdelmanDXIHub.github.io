@@ -87,6 +87,7 @@ function init() {
   toggleLegendBtn = document.getElementById("toggleLegendBtn");
 
   renderMonthTabs();
+  updateScheduleTitle();
   applyTotalsCollapse(localStorage.getItem("dxi-totals-collapsed") === "1");
   applyLegendCollapse(localStorage.getItem("dxi-legend-collapsed") === "1");
   renderPalette();
