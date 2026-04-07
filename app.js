@@ -61,6 +61,8 @@ let addBrandBtn;
 let exportExcelBtn;
 let templateFileInput;
 let recurringBtn;
+let legendPanel;
+let toggleLegendBtn;
 
 function init() {
   // Initialize DOM elements
@@ -81,9 +83,12 @@ function init() {
   exportExcelBtn = document.getElementById("exportExcelBtn");
   templateFileInput = document.getElementById("templateFileInput");
   recurringBtn = document.getElementById("recurringBtn");
+  legendPanel = document.getElementById("legendPanel");
+  toggleLegendBtn = document.getElementById("toggleLegendBtn");
 
   renderMonthTabs();
   applyTotalsCollapse(localStorage.getItem("dxi-totals-collapsed") === "1");
+  applyLegendCollapse(localStorage.getItem("dxi-legend-collapsed") === "1");
   renderPalette();
   renderTable();
   renderTotals();
@@ -438,6 +443,12 @@ function attachEvents() {
     localStorage.setItem("dxi-totals-collapsed", collapsed ? "1" : "0");
   });
 
+  toggleLegendBtn.addEventListener("click", () => {
+    const collapsed = !legendPanel.classList.contains("collapsed");
+    applyLegendCollapse(collapsed);
+    localStorage.setItem("dxi-legend-collapsed", collapsed ? "1" : "0");
+  });
+
   eraserBtn.addEventListener("click", () => {
     paintMode = paintMode === "erase" ? "brand" : "erase";
     updateEraserVisual();
@@ -752,6 +763,13 @@ function applyTotalsCollapse(collapsed) {
   layoutMain.classList.toggle("totals-collapsed", collapsed);
   toggleTotalsBtn.textContent = collapsed ? "Expand" : "Collapse";
   toggleTotalsBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+}
+
+function applyLegendCollapse(collapsed) {
+  legendPanel.classList.toggle("collapsed", collapsed);
+  layoutMain.classList.toggle("legend-collapsed", collapsed);
+  toggleLegendBtn.textContent = collapsed ? "Expand" : "Collapse";
+  toggleLegendBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
 }
 
 function updateEraserVisual() {

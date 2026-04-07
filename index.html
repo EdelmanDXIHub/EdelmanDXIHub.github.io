@@ -13,8 +13,11 @@
     </header>
 
     <main id="layoutMain" class="layout">
-      <aside class="panel legend-panel">
-        <h2>Brand Palette</h2>
+      <aside id="legendPanel" class="panel legend-panel">
+        <div class="legend-header">
+          <h2>Brand Palette</h2>
+          <button id="toggleLegendBtn" type="button" aria-expanded="true">Collapse</button>
+        </div>
         <div class="palette-actions">
           <button id="eraserBtn" type="button">Eraser</button>
           <button id="addBrandBtn" type="button">Add Brand</button>
