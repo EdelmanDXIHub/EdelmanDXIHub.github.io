@@ -37,14 +37,25 @@ async function loadDataFromSheet() {
     if (result.values && result.values[0] && result.values[0][0]) {
       const jsonString = result.values[0][0];
       const sheetData = JSON.parse(jsonString);
-      members = sheetData.members || [];
-      brands = sheetData.brands || [];
+      members = Array.isArray(sheetData.members) ? sheetData.members : [];
+      brands = Array.isArray(sheetData.brands) ? sheetData.brands : [];
       assignments = sheetData.assignments || {};
       // Also check if members/brands were saved inside assignments as _config
       if (assignments._config) {
-        if (assignments._config.members) members = assignments._config.members;
-        if (assignments._config.brands) brands = assignments._config.brands;
+        if (Array.isArray(assignments._config.members) && assignments._config.members.length) members = assignments._config.members;
+        if (Array.isArray(assignments._config.brands) && assignments._config.brands.length) brands = assignments._config.brands;
         delete assignments._config;
+      }
+      // If members is still empty, extract unique member names from assignments
+      if (!members.length && Object.keys(assignments).length) {
+        const memberSet = new Set();
+        for (const dayKey of Object.keys(assignments)) {
+          for (const name of Object.keys(assignments[dayKey])) {
+            memberSet.add(name);
+          }
+        }
+        members = [...memberSet];
+        console.log("⚠️ Members extraídos de assignments: " + members.length);
       }
       console.log("✅ Datos cargados del Sheet: " + members.length + " miembros, " + brands.length + " marcas, " + Object.keys(assignments).length + " días");
     } else {
