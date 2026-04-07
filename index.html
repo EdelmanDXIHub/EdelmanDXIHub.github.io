@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DXI Timing Map - Feb 2026</title>
+    <title>DXI Timing Map</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <header class="topbar">
       <h1>DXI Timing Map</h1>
-      <p>February 2026 | 30-minute slots | 8:00 AM - 5:00 PM</p>
+      <p>30-minute slots | 8:00 AM - 5:00 PM</p>
     </header>
 
     <main id="layoutMain" class="layout">
@@ -23,7 +23,9 @@
       </aside>
 
       <section class="panel scheduler-panel">
-        <h2>Interactive Schedule - Full Month (Feb 2026)</h2>
+        <h2>Interactive Schedule - Feb 2026</h2>
+
+        <div id="monthTabs" class="month-tabs"></div>
 
         <div class="toolbar">
           <button id="clearMonthBtn" type="button">Clear Full Month</button>
@@ -46,9 +48,9 @@
           <h2>Totals</h2>
           <button id="toggleTotalsBtn" type="button" aria-expanded="true">Collapse</button>
         </div>
-        <h3>By Brand (Full Month)</h3>
+        <h3 id="brandTotalsTitle">By Brand</h3>
         <div id="brandTotals"></div>
-        <h3>By Team Member (Full Month)</h3>
+        <h3 id="memberTotalsTitle">By Team Member</h3>
         <div id="memberTotals"></div>
       </aside>
     </main>

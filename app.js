@@ -1,4 +1,4 @@
-const STORAGE_KEY = "dxi-timing-map-feb-2026-v8";
+const STORAGE_KEY = "dxi-timing-map-2026-v9";
 const PRELOADED = window.PRELOADED_DATA || null;
 
 const fallbackColors = ["#2D6A4F", "#1D3557", "#8F2D56", "#CA6702", "#6A4C93", "#264653", "#386641", "#9D4EDD"];
@@ -11,10 +11,23 @@ const defaultBrands = ensureRequiredBrands(
   }))
 );
 
+// Month configuration: [year, monthIndex (0-based), label]
+const MONTHS = [
+  { year: 2026, month: 1, label: "Feb 2026" },
+  { year: 2026, month: 2, label: "Mar 2026" },
+  { year: 2026, month: 3, label: "Apr 2026" },
+];
+let currentMonthIdx = 0;
+
 const slots = buildSlots();
 const lunchSlots = new Set(slots.filter((s) => s.isLunch).map((s) => s.index));
-const weekdays = buildFebruaryWeekdays();
-const weeks = chunkWeekdays(weekdays, 5);
+
+// All weekdays across all months (for state initialization)
+const allWeekdays = MONTHS.flatMap((m) => buildMonthWeekdays(m.year, m.month));
+
+// Current month's weekdays (recalculated on tab switch)
+let weekdays = buildMonthWeekdays(MONTHS[0].year, MONTHS[0].month);
+let weeks = chunkWeekdays(weekdays, 5);
 
 const state = loadState() || createInitialState();
 let selectedBrandId = state.selectedBrandId || state.brands[0]?.id || null;
@@ -58,11 +71,53 @@ function init() {
   exportExcelBtn = document.getElementById("exportExcelBtn");
   templateFileInput = document.getElementById("templateFileInput");
 
+  renderMonthTabs();
   applyTotalsCollapse(localStorage.getItem("dxi-totals-collapsed") === "1");
   renderPalette();
   renderTable();
   renderTotals();
   attachEvents();
+}
+
+function switchMonth(idx) {
+  currentMonthIdx = idx;
+  const m = MONTHS[idx];
+  weekdays = buildMonthWeekdays(m.year, m.month);
+  weeks = chunkWeekdays(weekdays, 5);
+
+  // Ensure all days for this month exist in state
+  for (const day of weekdays) {
+    state.assignments[day.key] ||= {};
+    for (const member of state.members) {
+      state.assignments[day.key][member] ||= Array.from({ length: slots.length }, (_, i) => (lunchSlots.has(i) ? "LUNCH" : null));
+    }
+  }
+
+  renderMonthTabs();
+  renderTable();
+  renderTotals();
+  updateScheduleTitle();
+}
+
+function renderMonthTabs() {
+  const container = document.getElementById("monthTabs");
+  if (!container) return;
+  container.innerHTML = "";
+  MONTHS.forEach((m, idx) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = m.label;
+    btn.className = "month-tab" + (idx === currentMonthIdx ? " active" : "");
+    btn.addEventListener("click", () => switchMonth(idx));
+    container.appendChild(btn);
+  });
+}
+
+function updateScheduleTitle() {
+  const title = document.querySelector(".scheduler-panel h2");
+  if (title) {
+    title.textContent = `Interactive Schedule - ${MONTHS[currentMonthIdx].label}`;
+  }
 }
 
 function ensureRequiredBrands(brands) {
@@ -86,13 +141,14 @@ function buildSlots() {
   return built;
 }
 
-function buildFebruaryWeekdays() {
+function buildMonthWeekdays(year, month) {
   const out = [];
-  for (let day = 1; day <= 28; day += 1) {
-    const date = new Date(2026, 1, day);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(year, month, day);
     const weekDay = date.getDay();
     if (weekDay === 0 || weekDay === 6) continue;
-    const key = `2026-02-${String(day).padStart(2, "0")}`;
+    const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     out.push({ key, day, label: `${date.toLocaleDateString("en-US", { weekday: "short" })} ${day}` });
   }
   return out;
@@ -106,7 +162,7 @@ function chunkWeekdays(days, size) {
 
 function createInitialState() {
   const assignments = {};
-  for (const day of weekdays) {
+  for (const day of allWeekdays) {
     assignments[day.key] = {};
     for (const member of defaultMembers) {
       let row = Array.from({ length: slots.length }, (_, i) => (lunchSlots.has(i) ? "LUNCH" : null));
@@ -128,7 +184,7 @@ function loadState() {
     if (!parsed?.members || !parsed?.brands || !parsed?.assignments) return null;
 
     parsed.brands = ensureRequiredBrands(parsed.brands);
-    for (const day of weekdays) {
+    for (const day of allWeekdays) {
       parsed.assignments[day.key] ||= {};
       for (const member of parsed.members) {
         parsed.assignments[day.key][member] ||= Array.from({ length: slots.length }, () => null);
@@ -347,7 +403,7 @@ function attachEvents() {
   });
 
   clearMonthBtn.addEventListener("click", () => {
-    if (!confirm("Clear all assignments for the full month?")) return;
+    if (!confirm(`Clear all assignments for ${MONTHS[currentMonthIdx].label}?`)) return;
     for (const day of weekdays) {
       for (const member of state.members) {
         state.assignments[day.key][member] = slots.map((slot) => (slot.isLunch ? "LUNCH" : null));
@@ -367,7 +423,7 @@ function attachEvents() {
       return;
     }
     state.members.push(clean);
-    for (const day of weekdays) state.assignments[day.key][clean] = slots.map((slot) => (slot.isLunch ? "LUNCH" : null));
+    for (const day of allWeekdays) state.assignments[day.key][clean] = slots.map((slot) => (slot.isLunch ? "LUNCH" : null));
     renderTable();
     renderTotals();
     saveState();
@@ -389,7 +445,7 @@ function attachEvents() {
     const memberName = state.members[idx];
     if (!confirm(`Remove "${memberName}" and all their assignments?`)) return;
     state.members.splice(idx, 1);
-    for (const day of weekdays) {
+    for (const day of allWeekdays) {
       delete state.assignments[day.key][memberName];
     }
     renderTable();
@@ -472,7 +528,7 @@ async function exportScheduleToNewExcel() {
     sheet.name("Schedule");
 
     // Create header
-    sheet.cell("A1").value("DXI Timing Map - February 2026").style("bold", true).style("fontSize", 14);
+    sheet.cell("A1").value(`DXI Timing Map - ${MONTHS[currentMonthIdx].label}`).style("bold", true).style("fontSize", 14);
     sheet.cell("A2").value(`Export Date: ${todayStamp()}`).style("italic", true);
 
     // Column headers

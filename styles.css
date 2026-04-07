@@ -94,6 +94,35 @@ body {
   margin-bottom: 8px;
 }
 
+.month-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.month-tab {
+  padding: 7px 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px 6px 0 0;
+  background: #f0f5f2;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+}
+
+.month-tab:hover {
+  background: #e6f0ea;
+}
+
+.month-tab.active {
+  background: var(--panel);
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+  font-weight: 600;
+}
+
 button,
 input[type="color"],
 input[type="text"] {
