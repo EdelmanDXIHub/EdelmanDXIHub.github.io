@@ -60,6 +60,7 @@ let removeMemberBtn;
 let addBrandBtn;
 let exportExcelBtn;
 let templateFileInput;
+let recurringBtn;
 
 function init() {
   // Initialize DOM elements
@@ -79,6 +80,7 @@ function init() {
   addBrandBtn = document.getElementById("addBrandBtn");
   exportExcelBtn = document.getElementById("exportExcelBtn");
   templateFileInput = document.getElementById("templateFileInput");
+  recurringBtn = document.getElementById("recurringBtn");
 
   renderMonthTabs();
   applyTotalsCollapse(localStorage.getItem("dxi-totals-collapsed") === "1");
@@ -517,6 +519,8 @@ function attachEvents() {
     await exportScheduleToNewExcel();
   });
 
+  recurringBtn.addEventListener("click", openRecurringModal);
+
 
 
   scheduleBody.addEventListener("mousedown", (event) => {
@@ -760,6 +764,117 @@ function toLabel(hour, minute) {
   const twelveHour = hour % 12 === 0 ? 12 : hour % 12;
   const min = minute === 0 ? "00" : "30";
   return `${twelveHour}:${min} ${suffix}`;
+}
+
+/* ── Recurring Schedule Modal ── */
+function openRecurringModal() {
+  const modal = document.getElementById("recurringModal");
+  const memberSel = document.getElementById("recMember");
+  const brandSel = document.getElementById("recBrand");
+  const startSel = document.getElementById("recStart");
+  const endSel = document.getElementById("recEnd");
+  const scopeSel = document.getElementById("recScope");
+  const weekPicker = document.getElementById("recWeekPicker");
+  const weekSel = document.getElementById("recWeek");
+  const dayPicker = document.getElementById("recDayPicker");
+  const daysGrid = document.getElementById("recDays");
+
+  // Populate members
+  memberSel.innerHTML = state.members.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("");
+
+  // Populate brands
+  brandSel.innerHTML = state.brands
+    .filter((b) => b.name !== "LUNCH")
+    .map((b) => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`)
+    .join("");
+  if (selectedBrandId) brandSel.value = selectedBrandId;
+
+  // Populate time slots (non-lunch)
+  const timeOptions = slots
+    .filter((s) => !s.isLunch)
+    .map((s) => `<option value="${s.index}">${s.label}</option>`)
+    .join("");
+  startSel.innerHTML = timeOptions;
+  endSel.innerHTML = timeOptions;
+  // Default end to last slot
+  const nonLunch = slots.filter((s) => !s.isLunch);
+  if (nonLunch.length) endSel.value = String(nonLunch[nonLunch.length - 1].index);
+
+  // Populate weeks
+  weekSel.innerHTML = weeks.map((_, i) => `<option value="${i}">Week ${i + 1}</option>`).join("");
+
+  // Populate day chips
+  function renderDayChips() {
+    daysGrid.innerHTML = "";
+    for (const day of weekdays) {
+      const chip = document.createElement("span");
+      chip.className = "rec-day-chip selected";
+      chip.textContent = day.label;
+      chip.dataset.key = day.key;
+      chip.addEventListener("click", () => chip.classList.toggle("selected"));
+      daysGrid.appendChild(chip);
+    }
+  }
+  renderDayChips();
+
+  // Scope switching
+  function updateScope() {
+    weekPicker.hidden = scopeSel.value !== "monToFri";
+    dayPicker.hidden = scopeSel.value !== "pick";
+  }
+  scopeSel.onchange = updateScope;
+  updateScope();
+
+  // Cancel
+  document.getElementById("recCancel").onclick = () => { modal.hidden = true; };
+
+  // Apply
+  document.getElementById("recApply").onclick = () => {
+    const member = memberSel.value;
+    const brandId = brandSel.value;
+    const startIdx = Number(startSel.value);
+    const endIdx = Number(endSel.value);
+
+    if (startIdx > endIdx) {
+      alert("Start time must be before or equal to end time.");
+      return;
+    }
+
+    // Determine which days to apply
+    let targetDays;
+    if (scopeSel.value === "month") {
+      targetDays = weekdays.map((d) => d.key);
+    } else if (scopeSel.value === "monToFri") {
+      const wIdx = Number(weekSel.value);
+      targetDays = (weeks[wIdx] || []).map((d) => d.key);
+    } else {
+      targetDays = [...daysGrid.querySelectorAll(".rec-day-chip.selected")].map((c) => c.dataset.key);
+    }
+
+    if (!targetDays.length) {
+      alert("No days selected.");
+      return;
+    }
+
+    // Apply brand to slots in range for each target day
+    let count = 0;
+    for (const dayKey of targetDays) {
+      if (!state.assignments[dayKey]?.[member]) continue;
+      for (let i = startIdx; i <= endIdx; i += 1) {
+        if (lunchSlots.has(i)) continue;
+        state.assignments[dayKey][member][i] = brandId;
+        count += 1;
+      }
+    }
+
+    modal.hidden = true;
+    renderTable();
+    renderTotals();
+    saveState();
+    alert(`Applied to ${targetDays.length} day(s), ${count} slot(s) updated.`);
+  };
+
+  modal.hidden = false;
 }
 
 function escapeHtml(input) {

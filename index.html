@@ -31,6 +31,7 @@
           <button id="clearMonthBtn" type="button">Clear Full Month</button>
           <button id="addMemberBtn" type="button">Add Team Member</button>
           <button id="removeMemberBtn" type="button">Remove Team Member</button>
+          <button id="recurringBtn" type="button">Recurring Schedule</button>
           <button id="exportExcelBtn" type="button">Export Excel</button>
           <input id="templateFileInput" type="file" accept=".xlsx" hidden />
         </div>
@@ -62,6 +63,48 @@
         <span class="brand-name"></span>
       </label>
     </template>
+
+    <!-- Recurring Schedule Modal -->
+    <div id="recurringModal" class="modal-overlay" hidden>
+      <div class="modal-box">
+        <h3>Recurring Schedule</h3>
+        <p class="modal-desc">Fill the same brand &amp; time range across multiple days.</p>
+
+        <label class="modal-label">Team Member</label>
+        <select id="recMember" class="modal-select"></select>
+
+        <label class="modal-label">Brand</label>
+        <select id="recBrand" class="modal-select"></select>
+
+        <label class="modal-label">Start Time</label>
+        <select id="recStart" class="modal-select"></select>
+
+        <label class="modal-label">End Time</label>
+        <select id="recEnd" class="modal-select"></select>
+
+        <label class="modal-label">Apply to</label>
+        <select id="recScope" class="modal-select">
+          <option value="month">Every weekday of current month</option>
+          <option value="monToFri">Mon–Fri of selected week</option>
+          <option value="pick">Pick specific days</option>
+        </select>
+
+        <div id="recWeekPicker" class="modal-field" hidden>
+          <label class="modal-label">Week</label>
+          <select id="recWeek" class="modal-select"></select>
+        </div>
+
+        <div id="recDayPicker" class="modal-field" hidden>
+          <label class="modal-label">Select days</label>
+          <div id="recDays" class="rec-days-grid"></div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="recCancel" type="button" class="btn-secondary">Cancel</button>
+          <button id="recApply" type="button" class="btn-primary">Apply</button>
+        </div>
+      </div>
+    </div>
 
     <script src="./data.js?v=4"></script>
     <script src="./sync-sheets.js"></script>
