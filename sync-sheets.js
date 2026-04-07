@@ -31,15 +31,22 @@ async function loadDataFromSheet() {
     
     if (result.values && result.values[0] && result.values[0][0]) {
       const jsonString = result.values[0][0];
-      const data = JSON.parse(jsonString);
+      const sheetData = JSON.parse(jsonString);
       
-      // Update global PRELOADED_DATA
-      window.PRELOADED_DATA = data;
+      // Merge: keep members/brands from local data, use assignments from Sheet
+      const mergedData = {
+        members: window.PRELOADED_DATA?.members || [],
+        brands: window.PRELOADED_DATA?.brands || [],
+        assignments: sheetData.assignments || sheetData // Handle both full object and assignments-only
+      };
+      
+      // Update global PRELOADED_DATA with merged data
+      window.PRELOADED_DATA = mergedData;
       
       console.log("✅ Datos cargados del Sheet:");
-      console.log(`   - Miembros: ${data.members?.length || 0}`);
-      console.log(`   - Marcas: ${data.brands?.length || 0}`);
-      console.log(`   - Asignaciones: ${Object.keys(data.assignments || {}).length} días`);
+      console.log(`   - Miembros: ${mergedData.members?.length || 0}`);
+      console.log(`   - Marcas: ${mergedData.brands?.length || 0}`);
+      console.log(`   - Asignaciones: ${Object.keys(mergedData.assignments || {}).length} días`);
       
       return true;
     } else {
@@ -65,21 +72,22 @@ async function syncDataToSheet(state) {
   try {
     console.log("🔄 Sincronizando cambios al Sheet...");
     
-    const dataToSync = {
-      members: state.members || [],
-      brands: state.brands || [],
+    // Only sync assignments to Sheet, not members/brands (those stay local)
+    const assignmentsOnly = {
       assignments: state.assignments || {}
     };
+
+    // Use form-encoded data to avoid CORS preflight
+    const formData = new URLSearchParams();
+    formData.append('action', 'saveData');
+    formData.append('data', JSON.stringify(assignmentsOnly));
 
     const response = await fetch(WEB_APP_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: JSON.stringify({
-        action: "saveData",
-        data: dataToSync
-      })
+      body: formData.toString()
     });
 
     const result = await response.json();
