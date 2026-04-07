@@ -1,4 +1,4 @@
-const STORAGE_KEY = "dxi-timing-map-2026-v10";
+const STORAGE_KEY = "dxi-timing-map-2026-v11";
 const PRELOADED = window.PRELOADED_DATA || null;
 
 const fallbackColors = ["#2D6A4F", "#1D3557", "#8F2D56", "#CA6702", "#6A4C93", "#264653", "#386641", "#9D4EDD"];
@@ -149,7 +149,7 @@ function ensureRequiredBrands(brands) {
 function buildSlots() {
   const built = [];
   let idx = 0;
-  for (let hour = 8; hour < 17; hour += 1) {
+  for (let hour = 7; hour < 17; hour += 1) {
     for (const minute of [0, 30]) {
       built.push({ index: idx, label: toLabel(hour, minute), hour, minute, isLunch: hour === 13 });
       idx += 1;
@@ -833,16 +833,14 @@ function openRecurringModal() {
     .join("");
   if (selectedBrandId) brandSel.value = selectedBrandId;
 
-  // Populate time slots (non-lunch)
+  // Populate time slots (all slots including lunch)
   const timeOptions = slots
-    .filter((s) => !s.isLunch)
     .map((s) => `<option value="${s.index}">${s.label}</option>`)
     .join("");
   startSel.innerHTML = timeOptions;
   endSel.innerHTML = timeOptions;
   // Default end to last slot
-  const nonLunch = slots.filter((s) => !s.isLunch);
-  if (nonLunch.length) endSel.value = String(nonLunch[nonLunch.length - 1].index);
+  if (slots.length) endSel.value = String(slots[slots.length - 1].index);
 
   // Populate weeks
   weekSel.innerHTML = weeks.map((_, i) => `<option value="${i}">Week ${i + 1}</option>`).join("");
