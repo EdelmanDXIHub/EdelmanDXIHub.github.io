@@ -110,6 +110,9 @@ function configureSheetSync(apiKey, webAppUrl) {
   API_KEY = apiKey;
   WEB_APP_URL = webAppUrl;
   console.log("✅ Sincronización configurada");
+  console.log("📊 Google Sheet: https://docs.google.com/spreadsheets/d/" + SHEET_ID);
+  console.log("📡 Web App URL: " + WEB_APP_URL);
+  console.log("📋 Tab: " + SHEET_NAME + " | Celda: " + SHEET_RANGE);
 }
 
 /**
