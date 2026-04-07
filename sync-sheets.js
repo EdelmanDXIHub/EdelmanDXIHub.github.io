@@ -61,9 +61,9 @@ async function loadDataFromSheet() {
 }
 
 /**
- * Sends data to Google Sheet via Apps Script
+ * Sends data to Google Sheet via hidden form + iframe (bypasses CORS completely)
  */
-async function syncDataToSheet(state) {
+function syncDataToSheet(state) {
   if (!WEB_APP_URL) {
     console.warn("⚠️  Web App URL no configurada. Datos no sincronizados.");
     return false;
@@ -71,30 +71,50 @@ async function syncDataToSheet(state) {
 
   try {
     console.log("🔄 Sincronizando cambios al Sheet...");
-    
-    // Only sync assignments to Sheet, not members/brands (those stay local)
-    const payload = {
-      action: "saveData",
-      data: {
-        assignments: state.assignments || {}
-      }
-    };
 
-    // Use mode: 'no-cors' with text/plain to bypass CORS entirely
-    // Google Apps Script does NOT support custom CORS headers
-    // The request WILL reach the server, we just can't read the response
-    await fetch(WEB_APP_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {
-        "Content-Type": "text/plain"
-      },
-      body: JSON.stringify(payload)
+    // Only sync assignments to Sheet, not members/brands (those stay local)
+    const dataPayload = JSON.stringify({
+      assignments: state.assignments || {}
     });
 
-    // With no-cors mode, we can't read the response
-    // But the data was sent successfully to the server
-    console.log("✅ Cambios enviados al Sheet");
+    // Create hidden iframe (reuse if exists)
+    let iframe = document.getElementById("_sync_iframe");
+    if (!iframe) {
+      iframe = document.createElement("iframe");
+      iframe.id = "_sync_iframe";
+      iframe.name = "_sync_iframe";
+      iframe.style.display = "none";
+      document.body.appendChild(iframe);
+    }
+
+    // Create and submit a hidden form — form submissions are NOT subject to CORS
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = WEB_APP_URL;
+    form.target = "_sync_iframe";
+    form.style.display = "none";
+
+    const actionInput = document.createElement("input");
+    actionInput.type = "hidden";
+    actionInput.name = "action";
+    actionInput.value = "saveData";
+    form.appendChild(actionInput);
+
+    const dataInput = document.createElement("input");
+    dataInput.type = "hidden";
+    dataInput.name = "data";
+    dataInput.value = dataPayload;
+    form.appendChild(dataInput);
+
+    document.body.appendChild(form);
+    form.submit();
+
+    // Clean up form after submission
+    setTimeout(() => {
+      form.remove();
+    }, 1000);
+
+    console.log("✅ Cambios enviados al Sheet (form submit)");
     return true;
 
   } catch (error) {
