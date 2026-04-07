@@ -806,10 +806,8 @@ function updateEraserVisual() {
 }
 
 function toLabel(hour, minute) {
-  const suffix = hour >= 12 ? "PM" : "AM";
-  const twelveHour = hour % 12 === 0 ? 12 : hour % 12;
   const min = minute === 0 ? "00" : "30";
-  return `${twelveHour}:${min} ${suffix}`;
+  return `${hour}:${min}`;
 }
 
 /* ── Recurring Schedule Modal ── */
