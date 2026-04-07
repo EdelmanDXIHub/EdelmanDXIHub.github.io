@@ -11,7 +11,7 @@ let WEB_APP_URL = null;
 
 /**
  * Fetches data from Google Sheet using Sheets API
- * ALWAYS uses Sheet data — never falls back to data.js
+ * All data (members, brands, assignments) comes from the Sheet
  */
 async function loadDataFromSheet() {
   try {
@@ -30,36 +30,34 @@ async function loadDataFromSheet() {
     
     const result = await response.json();
     
-    // Always use members/brands from data.js (those are the source of truth for structure)
-    const members = window.PRELOADED_DATA?.members || [];
-    const brands = window.PRELOADED_DATA?.brands || [];
-    
+    let members = [];
+    let brands = [];
     let assignments = {};
     
     if (result.values && result.values[0] && result.values[0][0]) {
       const jsonString = result.values[0][0];
       const sheetData = JSON.parse(jsonString);
-      assignments = sheetData.assignments || sheetData;
-      console.log("✅ Asignaciones cargadas del Sheet: " + Object.keys(assignments).length + " días");
+      members = sheetData.members || [];
+      brands = sheetData.brands || [];
+      assignments = sheetData.assignments || {};
+      // Also check if members/brands were saved inside assignments as _config
+      if (assignments._config) {
+        if (assignments._config.members) members = assignments._config.members;
+        if (assignments._config.brands) brands = assignments._config.brands;
+        delete assignments._config;
+      }
+      console.log("✅ Datos cargados del Sheet: " + members.length + " miembros, " + brands.length + " marcas, " + Object.keys(assignments).length + " días");
     } else {
       console.warn("⚠️ Celda A1 vacía — se inicializará con datos en blanco");
     }
 
-    const mergedData = { members, brands, assignments };
-    window.PRELOADED_DATA = mergedData;
-    
-    console.log(`   - Miembros: ${members.length}`);
-    console.log(`   - Marcas: ${brands.length}`);
-    
+    window.PRELOADED_DATA = { members, brands, assignments };
     return true;
     
   } catch (error) {
     console.error("❌ Error al cargar Sheet:", error.message);
-    // Still use members/brands from data.js but assignments stay empty
-    const members = window.PRELOADED_DATA?.members || [];
-    const brands = window.PRELOADED_DATA?.brands || [];
-    window.PRELOADED_DATA = { members, brands, assignments: {} };
-    console.warn("⚠️ Usando miembros/marcas locales, asignaciones vacías (Sheet no disponible)");
+    window.PRELOADED_DATA = { members: [], brands: [], assignments: {} };
+    console.warn("⚠️ Sheet no disponible — datos vacíos");
     return false;
   }
 }
@@ -84,6 +82,9 @@ function syncDataToSheet(state, changedDay) {
     }
   }
 
+  // Also sync config (members + brands) whenever state changes
+  _pendingDays.add("_config");
+
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(() => _flushPendingDays(state), 2000);
   return true;
@@ -94,12 +95,17 @@ async function _flushPendingDays(state) {
   _pendingDays.clear();
   if (days.length === 0) return;
 
-  console.log("🔄 Sincronizando " + days.length + " día(s) al Sheet...");
+  console.log("🔄 Sincronizando " + days.length + " ítem(s) al Sheet...");
 
   let success = 0;
   let lastError = null;
   for (const day of days) {
-    const dayData = state.assignments[day];
+    let dayData;
+    if (day === "_config") {
+      dayData = { members: state.members, brands: state.brands };
+    } else {
+      dayData = state.assignments[day];
+    }
     if (dayData) {
       const result = await _sendDayViaGet(day, dayData);
       if (result.ok) {

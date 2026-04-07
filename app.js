@@ -1,11 +1,11 @@
-const STORAGE_KEY = "dxi-timing-map-2026-v11";
+const STORAGE_KEY = "dxi-timing-map-2026-v12";
 const PRELOADED = window.PRELOADED_DATA || null;
 
 const fallbackColors = ["#2D6A4F", "#1D3557", "#8F2D56", "#CA6702", "#6A4C93", "#264653", "#386641", "#9D4EDD"];
 
-const defaultMembers = PRELOADED?.members || ["Open Seat"];
+const defaultMembers = PRELOADED?.members?.length ? PRELOADED.members : ["Open Seat"];
 const defaultBrands = ensureRequiredBrands(
-  (PRELOADED?.brands || [{ id: "b1", name: "General", color: "#2D6A4F" }]).map((brand, idx) => ({
+  (PRELOADED?.brands?.length ? PRELOADED.brands : [{ id: "b1", name: "General", color: "#2D6A4F" }]).map((brand, idx) => ({
     ...brand,
     color: brand.color === "#000000" ? fallbackColors[idx % fallbackColors.length] : brand.color
   }))
