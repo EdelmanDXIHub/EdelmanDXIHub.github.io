@@ -61,66 +61,99 @@ async function loadDataFromSheet() {
 }
 
 /**
- * Sends data to Google Sheet via hidden form + iframe (bypasses CORS completely)
+ * Sends changed days to Google Sheet via GET requests (bypasses CORS+302 redirect)
+ * GET requests survive 302 redirects because data is in the URL, not the body
  */
-function syncDataToSheet(state) {
+let _pendingDays = new Set();
+let _syncTimer = null;
+
+function syncDataToSheet(state, changedDay) {
   if (!WEB_APP_URL) {
     console.warn("⚠️  Web App URL no configurada. Datos no sincronizados.");
     return false;
   }
 
-  try {
-    console.log("🔄 Sincronizando cambios al Sheet...");
-
-    // Only sync assignments to Sheet, not members/brands (those stay local)
-    const dataPayload = JSON.stringify({
-      assignments: state.assignments || {}
-    });
-
-    // Create hidden iframe (reuse if exists)
-    let iframe = document.getElementById("_sync_iframe");
-    if (!iframe) {
-      iframe = document.createElement("iframe");
-      iframe.id = "_sync_iframe";
-      iframe.name = "_sync_iframe";
-      iframe.style.display = "none";
-      document.body.appendChild(iframe);
+  // Track which day(s) need syncing
+  if (changedDay) {
+    _pendingDays.add(changedDay);
+  } else {
+    // No specific day = sync everything (e.g. clear month, add member)
+    for (const day of Object.keys(state.assignments || {})) {
+      _pendingDays.add(day);
     }
+  }
 
-    // Create and submit a hidden form — form submissions are NOT subject to CORS
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = WEB_APP_URL;
-    form.target = "_sync_iframe";
-    form.style.display = "none";
+  // Debounce: wait 2 seconds after last change before syncing
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(() => _flushPendingDays(state), 2000);
 
-    const actionInput = document.createElement("input");
-    actionInput.type = "hidden";
-    actionInput.name = "action";
-    actionInput.value = "saveData";
-    form.appendChild(actionInput);
+  return true;
+}
 
-    const dataInput = document.createElement("input");
-    dataInput.type = "hidden";
-    dataInput.name = "data";
-    dataInput.value = dataPayload;
-    form.appendChild(dataInput);
+async function _flushPendingDays(state) {
+  const days = [..._pendingDays];
+  _pendingDays.clear();
+  if (days.length === 0) return;
 
-    document.body.appendChild(form);
-    form.submit();
+  console.log("🔄 Sincronizando " + days.length + " día(s) al Sheet...");
 
-    // Clean up form after submission
-    setTimeout(() => {
-      form.remove();
-    }, 1000);
+  let success = 0;
+  for (const day of days) {
+    const dayData = state.assignments[day];
+    if (dayData) {
+      const ok = await _sendDayViaGet(day, dayData);
+      if (ok) success++;
+    }
+  }
 
-    console.log("✅ Cambios enviados al Sheet (form submit)");
-    return true;
+  console.log("✅ " + success + "/" + days.length + " día(s) sincronizados");
+}
 
-  } catch (error) {
-    console.error("❌ Error al sincronizar:", error.message);
+function _sendDayViaGet(dayKey, dayData) {
+  return new Promise((resolve) => {
+    const url = WEB_APP_URL
+      + "?action=saveDay"
+      + "&day=" + encodeURIComponent(dayKey)
+      + "&data=" + encodeURIComponent(JSON.stringify(dayData))
+      + "&t=" + Date.now();
+
+    // Image GET request: not subject to CORS, survives 302 redirects
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(true); // onerror expected (server returns JSON, not image)
+    img.src = url;
+
+    setTimeout(() => resolve(false), 15000);
+  });
+}
+
+// Full sync: push ALL current days to Sheet (call from console for manual sync)
+async function fullSyncToSheet() {
+  if (!WEB_APP_URL) {
+    console.error("❌ Web App URL no configurada");
     return false;
   }
+  const currentState = (typeof state !== 'undefined') ? state : null;
+  if (!currentState || !currentState.assignments) {
+    console.error("❌ No hay datos para sincronizar");
+    return false;
+  }
+
+  const assignments = currentState.assignments;
+  const days = Object.keys(assignments);
+
+  console.log("🔄 Full sync: enviando " + days.length + " días al Sheet...");
+
+  let success = 0;
+  for (const day of days) {
+    const ok = await _sendDayViaGet(day, assignments[day]);
+    if (ok) success++;
+    // Small delay between requests
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  console.log("✅ Full sync completo: " + success + "/" + days.length + " días");
+  return true;
 }
 
 /**

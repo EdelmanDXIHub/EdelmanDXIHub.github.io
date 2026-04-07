@@ -139,13 +139,13 @@ function loadState() {
   }
 }
 
-function saveState() {
+function saveState(changedDay) {
   state.selectedBrandId = selectedBrandId;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   
   // Sync changes to Google Sheet
   if (typeof syncDataToSheet === "function") {
-    syncDataToSheet(state);
+    syncDataToSheet(state, changedDay);
   }
 }
 
@@ -329,7 +329,7 @@ function memberMonthHours(member) {
 function applyToCell(member, dayKey, slotIndex) {
   if (lunchSlots.has(slotIndex)) return;
   state.assignments[dayKey][member][slotIndex] = paintMode === "erase" ? null : selectedBrandId;
-  saveState();
+  saveState(dayKey);
 }
 
 function attachEvents() {
