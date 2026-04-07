@@ -1,4 +1,4 @@
-const STORAGE_KEY = "dxi-timing-map-2026-v9";
+const STORAGE_KEY = "dxi-timing-map-2026-v10";
 const PRELOADED = window.PRELOADED_DATA || null;
 
 const fallbackColors = ["#2D6A4F", "#1D3557", "#8F2D56", "#CA6702", "#6A4C93", "#264653", "#386641", "#9D4EDD"];
@@ -13,11 +13,20 @@ const defaultBrands = ensureRequiredBrands(
 
 // Month configuration: [year, monthIndex (0-based), label]
 const MONTHS = [
+  { year: 2026, month: 0, label: "Jan 2026" },
   { year: 2026, month: 1, label: "Feb 2026" },
   { year: 2026, month: 2, label: "Mar 2026" },
   { year: 2026, month: 3, label: "Apr 2026" },
+  { year: 2026, month: 4, label: "May 2026" },
+  { year: 2026, month: 5, label: "Jun 2026" },
+  { year: 2026, month: 6, label: "Jul 2026" },
+  { year: 2026, month: 7, label: "Aug 2026" },
+  { year: 2026, month: 8, label: "Sep 2026" },
+  { year: 2026, month: 9, label: "Oct 2026" },
+  { year: 2026, month: 10, label: "Nov 2026" },
+  { year: 2026, month: 11, label: "Dec 2026" },
 ];
-let currentMonthIdx = 0;
+let currentMonthIdx = 3;
 
 const slots = buildSlots();
 const lunchSlots = new Set(slots.filter((s) => s.isLunch).map((s) => s.index));

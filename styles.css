@@ -96,17 +96,18 @@ body {
 
 .month-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   margin-bottom: 10px;
 }
 
 .month-tab {
-  padding: 7px 16px;
+  padding: 6px 10px;
   border: 1px solid var(--line);
   border-radius: 6px 6px 0 0;
   background: #f0f5f2;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 500;
   color: var(--muted);
   border-bottom: 2px solid transparent;
