@@ -1,141 +1,238 @@
-// Google Apps Script - Deploy como Web App
-// Execute as: Me
-// Who has access: Anyone
+const SPREADSHEET_ID = '1zTHQuHZN3gBRPASAg2hn8CN0qBiC3cl-b1nqDglju4c';
+const SHEET_NAME = 'assignments';
 
 function doGet(e) {
+  const action = e.parameter.action;
+  
   try {
-    // Handle case when run without parameters in Apps Script editor
-    if (!e) {
-      e = { parameter: {} };
+    if (action === 'debugSheets') {
+      return debugSheets();
+    } else if (action === 'initData') {
+      return initializeData();
+    } else if (action === 'getMembers') {
+      return getMembers();
+    } else if (action === 'getBrands') {
+      return getBrands();
+    } else if (action === 'getSchedule') {
+      return getSchedule();
     }
-    
-    const action = e.parameter?.action || "getData";
-    const callback = e.parameter?.callback;
-    
-    if (action === "getData") {
-      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Schedule");
-      const jsonString = sheet.getRange("A1").getValue();
-      
-      let response;
-      
-      if (!jsonString) {
-        response = {
-          success: false,
-          error: "Celda A1 vacía"
-        };
-      } else {
-        try {
-          const data = JSON.parse(jsonString);
-          response = {
-            success: true,
-            data: data
-          };
-        } catch (parseError) {
-          response = {
-            success: false,
-            error: "JSON inválido en A1"
-          };
-        }
-      }
-      
-      // Return JSONP if callback is provided
-      if (callback) {
-        return ContentService.createTextOutput(callback + '(' + JSON.stringify(response) + ')')
-          .setMimeType(ContentService.MimeType.JAVASCRIPT);
-      }
-      
-      // Otherwise return JSON
-      return ContentService.createTextOutput(JSON.stringify(response))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-    
+    return ContentService.createTextOutput(JSON.stringify({error: 'Invalid action'})).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
-    const response = {
-      success: false,
-      error: error.toString()
-    };
-    
-    if (e && e.parameter?.callback) {
-      return ContentService.createTextOutput(e.parameter.callback + '(' + JSON.stringify(response) + ')')
-        .setMimeType(ContentService.MimeType.JAVASCRIPT);
-    }
-    
-    return ContentService.createTextOutput(JSON.stringify(response))
-      .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
 function doPost(e) {
   try {
-    const data = JSON.parse(e.postData.contents);
+    let data;
     
-    if (data.action === "saveData") {
-      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Schedule");
-      const jsonString = JSON.stringify(data.data);
-      sheet.getRange("A1").setValue(jsonString);
-      
-      Logger.log("✅ Datos guardados en A1");
-      
-      return ContentService.createTextOutput(JSON.stringify({
-        success: true,
-        message: "Datos guardados correctamente"
-      })).setMimeType(ContentService.MimeType.JSON);
+    // Always try to get from parameters first (works for both JSON and form-encoded)
+    try {
+      if (e.parameter && e.parameter.data) {
+        const parsedData = JSON.parse(e.parameter.data);
+        data = {
+          action: e.parameter.action,
+          data: parsedData
+        };
+      } else if (e.postData && e.postData.contents) {
+        // Fall back to parsing entire body as JSON if no parameters
+        data = JSON.parse(e.postData.contents);
+      }
+    } catch (parseError) {
+      Logger.log('Parse error details: ' + parseError.toString());
+      Logger.log('postData contents: ' + (e.postData ? e.postData.contents : 'none').substring(0, 100));
+      Logger.log('parameter.data: ' + (e.parameter ? e.parameter.data : 'none'));
+      throw new Error('Failed to parse request: ' + parseError.toString());
     }
     
+    const action = data.action;
+    
+    if (action === 'saveData') {
+      if (data.data && data.data.assignments) {
+        const currentData = getDataFromCell();
+        currentData.assignments = data.data.assignments;
+        saveDataToCell(currentData);
+        return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+      }
+    } else if (action === 'saveSchedule') {
+      if (data.data) {
+        saveCompleteData(data.data);
+      } else {
+        saveSchedule(data.assignments);
+      }
+      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+    }
+    return ContentService.createTextOutput(JSON.stringify({error: 'Invalid action'})).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
-    Logger.log("❌ Error: " + error.toString());
-    return ContentService.createTextOutput(JSON.stringify({
-      success: false,
-      error: error.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
+    Logger.log('❌ Error in doPost: ' + error.toString());
+    return ContentService.createTextOutput(JSON.stringify({success: false, error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-function putDataInA1() {
-  const data = {
-    "members": [
-      "DXI Hub Weekly Timing Map",
-      "Daniela Mahecha",
-      "Daniela Oliva",
-      "Laura Álvarez",
-      "Natalia Bolaño",
-      "Hernan Torres",
-      "Ana Piraquive",
-      "David Bautista",
-      "Nicolas Lopez",
-      "Natalia Sanchez",
-      "David Guzman",
-      "Gabriela Pelayo"
-    ],
-    "brands": [
-      {"id": "b1", "name": "AMERICAN EGG BOARD (WEEKLY)", "color": "#FFFF00"},
-      {"id": "b2", "name": "DOVE (MONTHLY)", "color": "#FF8A80"},
-      {"id": "b3", "name": "DOVE (Super Bowl)", "color": "#0B77A0"},
-      {"id": "b4", "name": "DOVE DECK", "color": "#E59EDD"},
-      {"id": "b5", "name": "DXI Hub Weekly Timing Map", "color": "#2D6A4F"},
-      {"id": "b6", "name": "Daily", "color": "#1D3557"},
-      {"id": "b7", "name": "ELIMINI", "color": "#92D050"},
-      {"id": "b8", "name": "From 2/11 to 2/13", "color": "#8F2D56"},
-      {"id": "b9", "name": "IHOP (DAILY)", "color": "#FFC000"},
-      {"id": "b10", "name": "IKEA PBI adjustments", "color": "#040A10"},
-      {"id": "b11", "name": "Last Friday weekly", "color": "#CA6702"},
-      {"id": "b12", "name": "MCKINSEY (WEEKLY)", "color": "#00FA00"},
-      {"id": "b13", "name": "MONTHLY", "color": "#6A4C93"},
-      {"id": "b14", "name": "MSFT (MONTHLY)", "color": "#264653"},
-      {"id": "b15", "name": "MSFT LG2C (Monthly, Quaterly and Benchmark)", "color": "#0070C0"},
-      {"id": "b16", "name": "Marshalls Weekly wins", "color": "#C00000"},
-      {"id": "b17", "name": "Monthly", "color": "#386641"},
-      {"id": "b18", "name": "ServiceNow", "color": "#C04F15"},
-      {"id": "b19", "name": "TJX Marshalls TAGGING", "color": "#00B0F0"},
-      {"id": "b20", "name": "Unilever Crisis Report", "color": "#F2CFEE"},
-      {"id": "b21", "name": "WARNER", "color": "#A02B93"},
-      {"id": "b22", "name": "Weekly", "color": "#9D4EDD"}
-    ]
-  };
+// ============= HELPER: Get JSON from cell A1 =============
+function getDataFromCell() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    const cellValue = sheet.getRange('A1').getValue();
+    
+    if (!cellValue || cellValue === '') {
+      Logger.log('⚠️ Cell A1 is empty');
+      return { members: [], brands: {}, assignments: {} };
+    }
+    
+    const parsed = JSON.parse(cellValue);
+    Logger.log('✓ Data loaded from cell A1');
+    
+    // Backward compatibility: migrate 'schedule' to 'assignments' if needed
+    if (parsed.schedule && !parsed.assignments) {
+      parsed.assignments = parsed.schedule;
+      Logger.log('⚠️ Migrated old data format from schedule to assignments');
+    }
+    
+    return parsed;
+  } catch (error) {
+    Logger.log('❌ Error reading cell A1: ' + error);
+    return { members: [], brands: {}, assignments: {} };
+  }
+}
 
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Schedule");
-  const jsonString = JSON.stringify(data);
-  sheet.getRange("A1").setValue(jsonString);
-  
-  Logger.log("✅ JSON guardado en A1");
+// ============= HELPER: Save JSON to cell A1 =============
+function saveDataToCell(data) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    sheet.getRange('A1').setValue(JSON.stringify(data));
+    SpreadsheetApp.flush();
+    Logger.log('✓ Data saved to cell A1');
+    return true;
+  } catch (error) {
+    Logger.log('❌ Error saving to cell A1: ' + error);
+    return false;
+  }
+}
+
+// ============= GET MEMBERS =============
+function getMembers() {
+  try {
+    const data = getDataFromCell();
+    const members = data.members || [];
+    Logger.log('✓ Loaded ' + members.length + ' members');
+    return ContentService.createTextOutput(JSON.stringify(members)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    Logger.log('❌ Error in getMembers: ' + error);
+    return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ============= GET BRANDS =============
+function getBrands() {
+  try {
+    const data = getDataFromCell();
+    const brands = data.brands || {};
+    Logger.log('✓ Loaded ' + Object.keys(brands).length + ' brands');
+    return ContentService.createTextOutput(JSON.stringify(brands)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    Logger.log('❌ Error in getBrands: ' + error);
+    return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ============= GET SCHEDULE =============
+function getSchedule() {
+  try {
+    const data = getDataFromCell();
+    const schedule = data.assignments || {};
+    Logger.log('✓ Loaded schedule with ' + Object.keys(schedule).length + ' days');
+    return ContentService.createTextOutput(JSON.stringify(schedule)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    Logger.log('❌ Error in getSchedule: ' + error);
+    return ContentService.createTextOutput(JSON.stringify({})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ============= SAVE COMPLETE DATA =============
+function saveCompleteData(completeData) {
+  try {
+    // Save complete structure: { members, brands, assignments }
+    if (completeData && typeof completeData === 'object') {
+      const dataToSave = {
+        members: completeData.members || [],
+        brands: completeData.brands || {},
+        assignments: completeData.assignments || {}
+      };
+      saveDataToCell(dataToSave);
+      Logger.log('✓ Saved complete data: ' + Object.keys(dataToSave.assignments).length + ' days');
+      return true;
+    }
+    Logger.log('❌ Invalid data structure for saveCompleteData');
+    return false;
+  } catch (error) {
+    Logger.log('❌ Error in saveCompleteData: ' + error);
+    return false;
+  }
+}
+
+// ============= SAVE SCHEDULE =============
+function saveSchedule(newSchedule) {
+  try {
+    const data = getDataFromCell();
+    data.assignments = newSchedule;
+    saveDataToCell(data);
+    Logger.log('✓ Saved schedule with ' + Object.keys(newSchedule).length + ' days');
+    return true;
+  } catch (error) {
+    Logger.log('❌ Error in saveSchedule: ' + error);
+    return false;
+  }
+}
+
+// ============= DEBUG: Show all sheet info =============
+function debugSheets() {
+  try {
+    const data = getDataFromCell();
+    
+    const debugInfo = {
+      spreadsheet: 'AppTiming',
+      sheet: SHEET_NAME,
+      dataLocation: 'Cell A1 contains complete JSON',
+      members: {
+        count: data.members ? data.members.length : 0,
+        list: data.members ? data.members.slice(0, 5) : []
+      },
+      brands: {
+        count: data.brands ? Object.keys(data.brands).length : 0,
+        list: data.brands ? Object.keys(data.brands).slice(0, 5) : []
+      },
+      schedule: {
+        days: data.assignments ? Object.keys(data.assignments).length : 0,
+        firstDate: data.assignments ? Object.keys(data.assignments)[0] : null,
+        lastDate: data.assignments ? Object.keys(data.assignments)[Object.keys(data.assignments).length - 1] : null
+      }
+    };
+    
+    Logger.log('🔍 DEBUG: ' + JSON.stringify(debugInfo, null, 2));
+    return ContentService.createTextOutput(JSON.stringify(debugInfo)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    Logger.log('❌ Error in debugSheets: ' + error);
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ============= INITIALIZE DATA =============
+function initializeData() {
+  try {
+    const initialData = {
+      members: ["Open Seat"],
+      brands: {},
+      assignments: {}
+    };
+    
+    saveDataToCell(initialData);
+    Logger.log('✓ Data initialized in cell A1');
+    return ContentService.createTextOutput(JSON.stringify({success: true, message: 'Data initialized'})).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    Logger.log('❌ Error initializing data: ' + error);
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
 }
