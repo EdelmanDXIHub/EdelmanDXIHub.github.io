@@ -64,6 +64,10 @@ let recurringBtn;
 let legendPanel;
 let toggleLegendBtn;
 
+// Brand modal refs
+let brandModal, brandModalTitle, brandModalName, brandModalColor, brandModalHex, brandModalSave, brandModalCancel;
+let _brandModalResolve = null;
+
 function init() {
   // Initialize DOM elements
   layoutMain = document.getElementById("layoutMain");
@@ -85,6 +89,19 @@ function init() {
   recurringBtn = document.getElementById("recurringBtn");
   legendPanel = document.getElementById("legendPanel");
   toggleLegendBtn = document.getElementById("toggleLegendBtn");
+
+  // Brand modal
+  brandModal = document.getElementById("brandModal");
+  brandModalTitle = document.getElementById("brandModalTitle");
+  brandModalName = document.getElementById("brandModalName");
+  brandModalColor = document.getElementById("brandModalColor");
+  brandModalHex = document.getElementById("brandModalHex");
+  brandModalSave = document.getElementById("brandModalSave");
+  brandModalCancel = document.getElementById("brandModalCancel");
+  brandModalColor.addEventListener("input", () => { brandModalHex.textContent = brandModalColor.value.toUpperCase(); });
+  brandModalSave.addEventListener("click", () => { if (_brandModalResolve) _brandModalResolve(true); });
+  brandModalCancel.addEventListener("click", () => { if (_brandModalResolve) _brandModalResolve(false); });
+  brandModal.addEventListener("click", (e) => { if (e.target === brandModal && _brandModalResolve) _brandModalResolve(false); });
 
   renderMonthTabs();
   updateScheduleTitle();
@@ -515,16 +532,11 @@ function attachEvents() {
     saveState();
   });
 
-  addBrandBtn.addEventListener("click", () => {
-    const name = prompt("Brand name:");
-    if (!name || !name.trim()) return;
-    const color = prompt("Hex color (example: #1D3557):", "#1D3557");
-    if (!color || !/^#[0-9A-Fa-f]{6}$/.test(color.trim())) {
-      alert("Invalid color. Use format #RRGGBB");
-      return;
-    }
+  addBrandBtn.addEventListener("click", async () => {
+    const result = await openBrandModal("Add Brand", "", "#1D3557");
+    if (!result) return;
     const id = `b${Date.now()}`;
-    state.brands.push({ id, name: name.trim(), color: color.trim().toUpperCase() });
+    state.brands.push({ id, name: result.name, color: result.color });
     selectedBrandId = id;
     paintMode = "brand";
     renderPalette();
@@ -765,25 +777,41 @@ function todayStamp() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function editBrand(brandId) {
+async function editBrand(brandId) {
   const brand = state.brands.find((b) => b.id === brandId);
   if (!brand) return;
 
-  const newName = prompt("Edit brand name:", brand.name);
-  if (!newName || !newName.trim()) return;
+  const result = await openBrandModal("Edit Brand", brand.name, brand.color);
+  if (!result) return;
 
-  const newColor = prompt("Edit hex color:", brand.color);
-  if (!newColor || !/^#[0-9A-Fa-f]{6}$/.test(newColor.trim())) {
-    alert("Invalid color. Use format #RRGGBB");
-    return;
-  }
-
-  brand.name = newName.trim();
-  brand.color = newColor.trim().toUpperCase();
+  brand.name = result.name;
+  brand.color = result.color;
   renderPalette();
   renderTable();
   renderTotals();
   saveState();
+}
+
+function openBrandModal(title, name, color) {
+  brandModalTitle.textContent = title;
+  brandModalName.value = name;
+  brandModalColor.value = color;
+  brandModalHex.textContent = color.toUpperCase();
+  brandModal.hidden = false;
+  brandModalName.focus();
+  return new Promise((resolve) => {
+    _brandModalResolve = (ok) => {
+      _brandModalResolve = null;
+      brandModal.hidden = true;
+      if (ok) {
+        const n = brandModalName.value.trim();
+        if (!n) { resolve(null); return; }
+        resolve({ name: n, color: brandModalColor.value.toUpperCase() });
+      } else {
+        resolve(null);
+      }
+    };
+  });
 }
 
 function applyTotalsCollapse(collapsed) {
