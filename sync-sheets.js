@@ -90,7 +90,21 @@ async function syncDataToSheet(state) {
       body: formData.toString()
     });
 
-    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    // Parse response text and check if it's valid JSON
+    const responseText = await response.text();
+    console.log("📤 Response from Apps Script:", responseText.substring(0, 100));
+    
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Response was not JSON:", responseText);
+      throw new Error("Invalid response from server");
+    }
     
     if (result.success) {
       console.log("✅ Cambios sincronizados al Sheet");
