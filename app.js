@@ -170,7 +170,7 @@ function buildMonthWeekdays(year, month) {
     for (let i = daysBack; i >= 1; i -= 1) {
       const date = new Date(year, month, 1 - i);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      out.push({ key, day: date.getDate(), label: `${date.toLocaleDateString("en-US", { weekday: "short" })} ${date.getDate()}` });
+      out.push({ key, day: date.getDate(), label: `${date.toLocaleDateString("en-US", { weekday: "short" })} ${date.getDate()}`, foreign: true });
     }
   }
 
@@ -193,7 +193,7 @@ function buildMonthWeekdays(year, month) {
       const date = new Date(year, month, daysInMonth + i);
       if (date.getDay() === 0 || date.getDay() === 6) continue;
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      out.push({ key, day: date.getDate(), label: `${date.toLocaleDateString("en-US", { weekday: "short" })} ${date.getDate()}` });
+      out.push({ key, day: date.getDate(), label: `${date.toLocaleDateString("en-US", { weekday: "short" })} ${date.getDate()}`, foreign: true });
     }
   }
 
@@ -303,6 +303,7 @@ function renderTable() {
       const th = document.createElement("th");
       th.colSpan = slots.length;
       th.textContent = day.label;
+      if (day.foreign) th.classList.add("foreign-day");
       dayRow.appendChild(th);
       if (i < weekDays.length - 1) {
         const gap = document.createElement("th");
@@ -322,7 +323,8 @@ function renderTable() {
       for (const slot of slots) {
         const th = document.createElement("th");
         th.textContent = compactSlotLabel(slot);
-        if (slot.isLunch) th.style.background = "#e3e8e4";
+        if (weekDays[i].foreign) th.style.background = "#f0f2f1";
+        else if (slot.isLunch) th.style.background = "#e3e8e4";
         slotRow.appendChild(th);
       }
       if (i < weekDays.length - 1) {
@@ -348,11 +350,15 @@ function renderTable() {
           td.dataset.member = member;
           td.dataset.slot = String(slot.index);
           td.dataset.day = day.key;
-          if (slot.isLunch) {
+          if (day.foreign) {
+            td.classList.add("foreign");
+            td.style.background = "#f0f2f1";
+          } else if (slot.isLunch) {
             td.classList.add("lunch");
             td.textContent = "L";
+          } else {
+            paintCell(td, state.assignments[day.key][member][slot.index]);
           }
-          paintCell(td, state.assignments[day.key][member][slot.index]);
           tr.appendChild(td);
         }
         if (i < weekDays.length - 1) {
@@ -390,6 +396,7 @@ function renderTotals() {
   for (const member of state.members) {
     let memberHalfHours = 0;
     for (const day of weekdays) {
+      if (day.foreign) continue;
       const arr = state.assignments[day.key][member];
       for (let i = 0; i < arr.length; i += 1) {
         const value = arr[i];
@@ -421,6 +428,7 @@ function renderTotalList(items, emptyText) {
 function memberMonthHours(member) {
   let hh = 0;
   for (const day of weekdays) {
+    if (day.foreign) continue;
     const arr = state.assignments[day.key][member];
     for (let i = 0; i < arr.length; i += 1) {
       if (lunchSlots.has(i)) continue;
@@ -457,6 +465,7 @@ function attachEvents() {
   clearMonthBtn.addEventListener("click", () => {
     if (!confirm(`Clear all assignments for ${MONTHS[currentMonthIdx].label}?`)) return;
     for (const day of weekdays) {
+      if (day.foreign) continue;
       for (const member of state.members) {
         state.assignments[day.key][member] = slots.map((slot) => (slot.isLunch ? "LUNCH" : null));
       }
@@ -536,7 +545,7 @@ function attachEvents() {
 
   scheduleBody.addEventListener("mousedown", (event) => {
     const cell = event.target.closest(".slot-cell");
-    if (!cell || cell.classList.contains("lunch")) return;
+    if (!cell || cell.classList.contains("lunch") || cell.classList.contains("foreign")) return;
     isMouseDown = true;
     const member = cell.dataset.member;
     const dayKey = cell.dataset.day;
@@ -549,7 +558,7 @@ function attachEvents() {
   scheduleBody.addEventListener("mouseover", (event) => {
     if (!isMouseDown) return;
     const cell = event.target.closest(".slot-cell");
-    if (!cell || cell.classList.contains("lunch")) return;
+    if (!cell || cell.classList.contains("lunch") || cell.classList.contains("foreign")) return;
     const member = cell.dataset.member;
     const dayKey = cell.dataset.day;
     const slotIndex = Number(cell.dataset.slot);
@@ -606,6 +615,7 @@ async function exportScheduleToNewExcel() {
     for (const member of state.members) {
       // Iterate through each weekday
       for (const weekday of weekdays) {
+        if (weekday.foreign) continue;
         const dayKey = weekday.key;
         const assignments = state.assignments[dayKey]?.[member] || [];
 
@@ -842,6 +852,7 @@ function openRecurringModal() {
   function renderDayChips() {
     daysGrid.innerHTML = "";
     for (const day of weekdays) {
+      if (day.foreign) continue;
       const chip = document.createElement("span");
       chip.className = "rec-day-chip selected";
       chip.textContent = day.label;
@@ -878,10 +889,10 @@ function openRecurringModal() {
     // Determine which days to apply
     let targetDays;
     if (scopeSel.value === "month") {
-      targetDays = weekdays.map((d) => d.key);
+      targetDays = weekdays.filter((d) => !d.foreign).map((d) => d.key);
     } else if (scopeSel.value === "monToFri") {
       const wIdx = Number(weekSel.value);
-      targetDays = (weeks[wIdx] || []).map((d) => d.key);
+      targetDays = (weeks[wIdx] || []).filter((d) => !d.foreign).map((d) => d.key);
     } else {
       targetDays = [...daysGrid.querySelectorAll(".rec-day-chip.selected")].map((c) => c.dataset.key);
     }

@@ -257,7 +257,17 @@ td {
   cursor: not-allowed;
 }
 
-.slot-cell:hover:not(.lunch) {
+.slot-cell.foreign {
+  background: #f0f2f1 !important;
+  cursor: not-allowed;
+}
+
+.foreign-day {
+  background: #f0f2f1;
+  color: #b0b8b3;
+}
+
+.slot-cell:hover:not(.lunch):not(.foreign) {
   box-shadow: inset 0 0 0 2px rgba(13, 122, 95, 0.4);
 }
 
