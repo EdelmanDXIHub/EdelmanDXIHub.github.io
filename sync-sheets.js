@@ -168,14 +168,21 @@ async function _flushPendingDays(state) {
   }
 }
 
-async function _sendDayViaGet(dayKey, dayData) {
+async function _sendDay(dayKey, dayData) {
   try {
-    const url = WEB_APP_URL
-      + "?action=saveDay"
-      + "&day=" + encodeURIComponent(dayKey)
-      + "&data=" + encodeURIComponent(JSON.stringify(dayData));
+    const payload = JSON.stringify({
+      action: "saveDay",
+      day: dayKey,
+      data: JSON.stringify(dayData)
+    });
 
-    const response = await fetch(url);
+    // Use POST to avoid GET URL length limits (~2KB)
+    // Content-Type text/plain avoids CORS preflight
+    const response = await fetch(WEB_APP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: payload
+    });
     const text = await response.text();
     
     try {
@@ -187,7 +194,6 @@ async function _sendDayViaGet(dayKey, dayData) {
         return { ok: false, error: json.error || "Unknown error" };
       }
     } catch {
-      // If response isn't JSON, log it
       console.error("❌ Respuesta no-JSON para " + dayKey + ":", text.substring(0, 200));
       return { ok: false, error: "Non-JSON response" };
     }
