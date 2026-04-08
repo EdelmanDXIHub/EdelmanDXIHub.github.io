@@ -542,6 +542,7 @@ function attachEvents() {
     renderTable();
     renderTotals();
     saveState();
+    showToast(`All assignments cleared for ${MONTHS[currentMonthIdx].label}`);
   });
 
   addMemberBtn.addEventListener("click", () => {
@@ -549,7 +550,7 @@ function attachEvents() {
     if (!name || !name.trim()) return;
     const clean = name.trim();
     if (state.members.includes(clean)) {
-      alert("Team member already exists.");
+      showToast("Team member already exists", "error");
       return;
     }
     state.members.push(clean);
@@ -557,6 +558,7 @@ function attachEvents() {
     renderTable();
     renderTotals();
     saveState();
+    showToast(`Team member "${clean}" added`);
   });
 
   removeMemberBtn.addEventListener("click", () => {
@@ -581,6 +583,7 @@ function attachEvents() {
     renderTable();
     renderTotals();
     saveState();
+    showToast(`Team member "${memberName}" removed`);
   });
 
   addBrandBtn.addEventListener("click", async () => {
@@ -593,6 +596,7 @@ function attachEvents() {
     renderPalette();
     renderTable();
     saveState();
+    showToast(`Brand "${result.name}" added`);
   });
 
   exportExcelBtn.addEventListener("click", async () => {
@@ -732,9 +736,10 @@ async function exportScheduleToNewExcel() {
     // Save and download
     const out = await workbook.outputAsync();
     downloadBlob(out, `DXI_Timing_Map_${todayStamp()}.xlsx`);
+    showToast("Excel exported successfully");
   } catch (error) {
     console.error(error);
-    alert(`Export failed. ${error?.message || "Please try again."}`);
+    showToast(`Export failed: ${error?.message || "Please try again"}`, "error");
   } finally {
     exportExcelBtn.disabled = false;
     exportExcelBtn.textContent = "Export Excel";
@@ -841,6 +846,7 @@ async function editBrand(brandId) {
   renderTable();
   renderTotals();
   saveState();
+  showToast(`Brand "${result.name}" updated`);
 }
 
 function deleteBrand(brandId) {
@@ -868,6 +874,7 @@ function deleteBrand(brandId) {
   renderTable();
   renderTotals();
   saveState();
+  showToast(`Brand "${brand.name}" deleted`);
 }
 
 function openBrandModal(title, name, color) {
@@ -1018,7 +1025,7 @@ function openRecurringModal() {
     renderTable();
     renderTotals();
     saveState();
-    alert(`Applied to ${targetDays.length} day(s), ${count} slot(s) updated.`);
+    showToast(`Schedule applied to ${targetDays.length} day(s), ${count} slot(s) updated`);
   };
 
   modal.hidden = false;
@@ -1031,4 +1038,22 @@ function escapeHtml(input) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function showToast(message, type = "success") {
+  let container = document.getElementById("toastContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toastContainer";
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("show"));
+  setTimeout(() => {
+    toast.classList.remove("show");
+    toast.addEventListener("transitionend", () => toast.remove());
+  }, 3000);
 }
