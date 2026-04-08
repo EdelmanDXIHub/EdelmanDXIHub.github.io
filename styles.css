@@ -180,7 +180,7 @@ button:hover {
 
 .brand-item {
   display: grid;
-  grid-template-columns: auto 14px 1fr;
+  grid-template-columns: auto 14px 1fr auto;
   align-items: center;
   gap: 4px;
   padding: 3px;
@@ -190,6 +190,19 @@ button:hover {
 
 .brand-item input {
   margin: 0;
+}
+
+.brand-delete {
+  background: none;
+  border: none;
+  color: #b0b0b0;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+.brand-delete:hover {
+  color: #d32f2f;
 }
 
 .swatch {

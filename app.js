@@ -289,6 +289,11 @@ function renderPalette() {
       saveState();
     });
     node.addEventListener("dblclick", () => editBrand(brand.id));
+    node.querySelector(".brand-delete").addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      deleteBrand(brand.id);
+    });
     brandPalette.appendChild(node);
   }
   updateEraserVisual();
@@ -786,6 +791,33 @@ async function editBrand(brandId) {
 
   brand.name = result.name;
   brand.color = result.color;
+  renderPalette();
+  renderTable();
+  renderTotals();
+  saveState();
+}
+
+function deleteBrand(brandId) {
+  const brand = state.brands.find((b) => b.id === brandId);
+  if (!brand) return;
+  if (!confirm(`Delete brand "${brand.name}"? Assignments using this brand will be cleared.`)) return;
+
+  state.brands = state.brands.filter((b) => b.id !== brandId);
+  // Remove from assignments
+  for (const dayKey of Object.keys(state.assignments)) {
+    const day = state.assignments[dayKey];
+    for (const member of Object.keys(day)) {
+      const slots = day[member];
+      if (Array.isArray(slots)) {
+        for (let i = 0; i < slots.length; i++) {
+          if (slots[i] === brandId) slots[i] = null;
+        }
+      }
+    }
+  }
+  if (selectedBrandId === brandId) {
+    selectedBrandId = state.brands.length ? state.brands[0].id : null;
+  }
   renderPalette();
   renderTable();
   renderTotals();
