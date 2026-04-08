@@ -19,7 +19,7 @@ async function loadDataFromSheet() {
       throw new Error("API Key no configurada");
     }
     
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!${SHEET_RANGE}?key=${API_KEY}&_t=${Date.now()}`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!${SHEET_RANGE}?key=${API_KEY}`;
     const response = await fetch(url, { cache: 'no-store' });
     
     if (!response.ok) {
@@ -142,7 +142,7 @@ async function _flushPendingDays(state) {
   // Verify write by reading back
   if (allOk && API_KEY) {
     try {
-      const verifyUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!${SHEET_RANGE}?key=${API_KEY}&_t=${Date.now()}`;
+      const verifyUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!${SHEET_RANGE}?key=${API_KEY}`;
       const vRes = await fetch(verifyUrl, { cache: 'no-store' });
       if (vRes.ok) {
         const vJson = await vRes.json();
