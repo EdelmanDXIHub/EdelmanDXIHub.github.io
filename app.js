@@ -507,10 +507,12 @@ function memberMonthHours(member) {
   return hh * 0.5;
 }
 
+let _lastPaintSyncPromise = null;
+
 function applyToCell(member, dayKey, slotIndex) {
   if (lunchSlots.has(slotIndex)) return;
   state.assignments[dayKey][member][slotIndex] = paintMode === "erase" ? null : selectedBrandId;
-  saveState(dayKey);
+  _lastPaintSyncPromise = saveState(dayKey);
 }
 
 function attachEvents() {
@@ -642,18 +644,28 @@ function attachEvents() {
     paintCell(cell, state.assignments[dayKey][member][slotIndex]);
   });
 
-  scheduleBody.addEventListener("mouseup", () => {
+  scheduleBody.addEventListener("mouseup", async () => {
     if (!isMouseDown) return;
     isMouseDown = false;
     renderTable();
     renderTotals();
+    if (_lastPaintSyncPromise) {
+      const ok = await _lastPaintSyncPromise;
+      _lastPaintSyncPromise = null;
+      showToast(ok ? "Changes synced" : "Sync failed — changes saved locally", ok ? "success" : "error");
+    }
   });
 
-  document.addEventListener("mouseup", () => {
+  document.addEventListener("mouseup", async () => {
     if (!isMouseDown) return;
     isMouseDown = false;
     renderTable();
     renderTotals();
+    if (_lastPaintSyncPromise) {
+      const ok = await _lastPaintSyncPromise;
+      _lastPaintSyncPromise = null;
+      showToast(ok ? "Changes synced" : "Sync failed — changes saved locally", ok ? "success" : "error");
+    }
   });
 }
 
