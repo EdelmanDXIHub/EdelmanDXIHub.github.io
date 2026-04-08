@@ -1,15 +1,18 @@
-const STORAGE_KEY = "dxi-timing-map-2026-v12";
-const PRELOADED = window.PRELOADED_DATA || null;
+const STORAGE_KEY = "dxi-timing-map-2026-v13";
 
 const fallbackColors = ["#2D6A4F", "#1D3557", "#8F2D56", "#CA6702", "#6A4C93", "#264653", "#386641", "#9D4EDD"];
 
-const defaultMembers = PRELOADED?.members?.length ? PRELOADED.members : ["Open Seat"];
-const defaultBrands = ensureRequiredBrands(
-  (PRELOADED?.brands?.length ? PRELOADED.brands : [{ id: "b1", name: "General", color: "#2D6A4F" }]).map((brand, idx) => ({
-    ...brand,
-    color: brand.color === "#000000" ? fallbackColors[idx % fallbackColors.length] : brand.color
-  }))
-);
+function resolveDefaults() {
+  const pre = window.PRELOADED_DATA || null;
+  const members = pre?.members?.length ? pre.members : ["Open Seat"];
+  const brands = ensureRequiredBrands(
+    (pre?.brands?.length ? pre.brands : [{ id: "b1", name: "General", color: "#2D6A4F" }]).map((brand, idx) => ({
+      ...brand,
+      color: brand.color === "#000000" ? fallbackColors[idx % fallbackColors.length] : brand.color
+    }))
+  );
+  return { members, brands, pre };
+}
 
 // Month configuration: [year, monthIndex (0-based), label]
 const MONTHS = [
@@ -38,8 +41,8 @@ const allWeekdays = MONTHS.flatMap((m) => buildMonthWeekdays(m.year, m.month));
 let weekdays = buildMonthWeekdays(MONTHS[currentMonthIdx].year, MONTHS[currentMonthIdx].month);
 let weeks = chunkWeekdays(weekdays, 5);
 
-const state = loadState() || createInitialState();
-let selectedBrandId = state.selectedBrandId || state.brands[0]?.id || null;
+let state = null;
+let selectedBrandId = null;
 let paintMode = "brand";
 let isMouseDown = false;
 
@@ -69,6 +72,15 @@ let brandModal, brandModalTitle, brandModalName, brandModalColor, brandModalHex,
 let _brandModalResolve = null;
 
 function init() {
+  // Resolve state from Sheet data (now available) + localStorage
+  const { members: defaultMembers, brands: defaultBrands, pre: PRELOADED } = resolveDefaults();
+  state = loadStateFromStorage(defaultBrands) || createInitialState(defaultMembers, defaultBrands, PRELOADED);
+  // Always merge fresh Sheet assignments into state (Sheet is source of truth)
+  if (PRELOADED?.assignments) {
+    mergeSheetIntoState(state, PRELOADED, defaultMembers);
+  }
+  selectedBrandId = state.selectedBrandId || state.brands[0]?.id || null;
+
   // Initialize DOM elements
   layoutMain = document.getElementById("layoutMain");
   totalsPanel = document.getElementById("totalsPanel");
@@ -224,7 +236,7 @@ function chunkWeekdays(days, size) {
   return out;
 }
 
-function createInitialState() {
+function createInitialState(defaultMembers, defaultBrands, PRELOADED) {
   const assignments = {};
   for (const day of allWeekdays) {
     assignments[day.key] = {};
@@ -240,7 +252,7 @@ function createInitialState() {
   return { members: [...defaultMembers], brands: [...defaultBrands], assignments, selectedBrandId: defaultBrands[0]?.id };
 }
 
-function loadState() {
+function loadStateFromStorage(defaultBrands) {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
@@ -258,6 +270,52 @@ function loadState() {
     return parsed;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Merge Sheet data into state — Sheet is the source of truth.
+ * New members from Sheet are added, assignments from Sheet overwrite localStorage.
+ */
+function mergeSheetIntoState(state, PRELOADED, defaultMembers) {
+  // Merge members: add any from Sheet that aren't already in state
+  for (const m of defaultMembers) {
+    if (!state.members.includes(m)) {
+      state.members.push(m);
+    }
+  }
+
+  // Merge assignments from Sheet (Sheet wins over localStorage)
+  for (const dayKey of Object.keys(PRELOADED.assignments)) {
+    const sheetDay = PRELOADED.assignments[dayKey];
+    state.assignments[dayKey] ||= {};
+    for (const member of Object.keys(sheetDay)) {
+      if (!state.members.includes(member)) {
+        state.members.push(member);
+      }
+      const pre = sheetDay[member];
+      if (Array.isArray(pre)) {
+        state.assignments[dayKey][member] = pre.map((v, i) => (lunchSlots.has(i) ? "LUNCH" : v || null));
+      }
+    }
+  }
+
+  // Merge brands from Sheet if available
+  if (PRELOADED.brands?.length) {
+    state.brands = ensureRequiredBrands(
+      PRELOADED.brands.map((brand, idx) => ({
+        ...brand,
+        color: brand.color === "#000000" ? fallbackColors[idx % fallbackColors.length] : brand.color
+      }))
+    );
+  }
+
+  // Ensure all members have slots for all weekdays
+  for (const day of allWeekdays) {
+    state.assignments[day.key] ||= {};
+    for (const member of state.members) {
+      state.assignments[day.key][member] ||= Array.from({ length: slots.length }, (_, i) => (lunchSlots.has(i) ? "LUNCH" : null));
+    }
   }
 }
 
