@@ -142,7 +142,7 @@ async function _flushPendingDays(state) {
         if (payload.length > 6000) {
           console.warn("⚠️ Payload grande para " + day + ": " + payload.length + " chars");
         }
-        const result = await _sendDayViaGet(day, dayData);
+        const result = await _sendDay(day, dayData);
         if (result.ok) {
           success++;
         } else {
@@ -216,7 +216,7 @@ async function fullSyncToSheet() {
 
   let success = 0;
   for (const day of days) {
-    const result = await _sendDayViaGet(day, assignments[day]);
+    const result = await _sendDay(day, assignments[day]);
     if (result.ok) {
       success++;
       console.log("  ✓ " + day);
