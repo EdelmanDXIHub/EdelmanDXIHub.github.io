@@ -170,19 +170,16 @@ async function _flushPendingDays(state) {
 
 async function _sendDay(dayKey, dayData) {
   try {
-    const payload = JSON.stringify({
-      action: "saveDay",
-      day: dayKey,
-      data: JSON.stringify(dayData)
-    });
+    const url = WEB_APP_URL
+      + "?action=saveDay"
+      + "&day=" + encodeURIComponent(dayKey)
+      + "&data=" + encodeURIComponent(JSON.stringify(dayData));
 
-    // Use POST to avoid GET URL length limits (~2KB)
-    // Content-Type text/plain avoids CORS preflight
-    const response = await fetch(WEB_APP_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: payload
-    });
+    if (url.length > 8000) {
+      console.warn("⚠️ URL muy larga para " + dayKey + ": " + url.length + " chars");
+    }
+
+    const response = await fetch(url);
     const text = await response.text();
     
     try {
