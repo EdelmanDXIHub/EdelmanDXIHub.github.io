@@ -5,12 +5,11 @@ const fallbackColors = ["#2D6A4F", "#1D3557", "#8F2D56", "#CA6702", "#6A4C93", "
 function resolveDefaults() {
   const pre = window.PRELOADED_DATA || null;
   const members = pre?.members?.length ? pre.members : ["Open Seat"];
-  const brands = ensureRequiredBrands(
+  const brands = 
     (pre?.brands?.length ? pre.brands : [{ id: "b1", name: "General", color: "#2D6A4F" }]).map((brand, idx) => ({
       ...brand,
       color: brand.color === "#000000" ? fallbackColors[idx % fallbackColors.length] : brand.color
-    }))
-  );
+    }));
   return { members, brands, pre };
 }
 
@@ -166,15 +165,6 @@ function updateScheduleTitle() {
   }
 }
 
-function ensureRequiredBrands(brands) {
-  const out = [...brands];
-  const hasLg2c = out.some((b) => b.name.toUpperCase().includes("LG2C"));
-  if (!hasLg2c) {
-    out.push({ id: `b_lg2c_${Date.now()}`, name: "LG2C (Monthly, Quaterly and Benchmark)", color: "#FF2600" });
-  }
-  return out;
-}
-
 function buildSlots() {
   const built = [];
   let idx = 0;
@@ -259,7 +249,6 @@ function loadStateFromStorage(defaultBrands) {
     const parsed = JSON.parse(raw);
     if (!parsed?.members || !parsed?.brands || !parsed?.assignments) return null;
 
-    parsed.brands = ensureRequiredBrands(parsed.brands);
     for (const day of allWeekdays) {
       parsed.assignments[day.key] ||= {};
       for (const member of parsed.members) {
@@ -302,12 +291,11 @@ function mergeSheetIntoState(state, PRELOADED, defaultMembers) {
 
   // Merge brands from Sheet if available
   if (PRELOADED.brands?.length) {
-    state.brands = ensureRequiredBrands(
+    state.brands = 
       PRELOADED.brands.map((brand, idx) => ({
         ...brand,
         color: brand.color === "#000000" ? fallbackColors[idx % fallbackColors.length] : brand.color
-      }))
-    );
+      }));
   }
 
   // Ensure all members have slots for all weekdays
