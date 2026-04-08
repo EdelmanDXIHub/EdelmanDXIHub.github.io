@@ -42,11 +42,12 @@ async function loadDataFromSheet() {
       assignments = sheetData.assignments || {};
       // Also check if members/brands were saved inside assignments as _config
       if (assignments._config) {
+        if (Array.isArray(assignments._config.members) && assignments._config.members.length) members = assignments._config.members;
         if (Array.isArray(assignments._config.brands) && assignments._config.brands.length) brands = assignments._config.brands;
         delete assignments._config;
       }
-      // ALWAYS extract unique member names from actual day assignments (source of truth)
-      if (Object.keys(assignments).length) {
+      // If _config had no members, fall back to extracting from assignment keys
+      if (!members.length && Object.keys(assignments).length) {
         const memberSet = new Set();
         for (const dayKey of Object.keys(assignments)) {
           for (const name of Object.keys(assignments[dayKey])) {
@@ -54,7 +55,7 @@ async function loadDataFromSheet() {
           }
         }
         members = [...memberSet];
-        console.log("✅ Members extraídos de assignments: " + members.length);
+        console.log("✅ Members extraídos de assignments (fallback): " + members.length);
       }
       console.log("✅ Datos cargados del Sheet: " + members.length + " miembros, " + brands.length + " marcas, " + Object.keys(assignments).length + " días");
     } else {
@@ -78,17 +79,17 @@ async function loadDataFromSheet() {
 let _pendingDays = new Set();
 let _syncTimer = null;
 
-function syncDataToSheet(state, changedDay) {
+function syncDataToSheet(state, changedDays) {
   if (!WEB_APP_URL) {
     console.warn("⚠️  Web App URL no configurada.");
     return false;
   }
 
-  if (changedDay) {
-    _pendingDays.add(changedDay);
-  } else {
-    for (const day of Object.keys(state.assignments || {})) {
-      _pendingDays.add(day);
+  if (changedDays) {
+    if (Array.isArray(changedDays)) {
+      for (const d of changedDays) _pendingDays.add(d);
+    } else {
+      _pendingDays.add(changedDays);
     }
   }
 

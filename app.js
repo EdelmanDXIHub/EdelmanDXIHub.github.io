@@ -533,15 +533,17 @@ function attachEvents() {
 
   clearMonthBtn.addEventListener("click", () => {
     if (!confirm(`Clear all assignments for ${MONTHS[currentMonthIdx].label}?`)) return;
+    const clearedDays = [];
     for (const day of weekdays) {
       if (day.foreign) continue;
       for (const member of state.members) {
         state.assignments[day.key][member] = slots.map((slot) => (slot.isLunch ? "LUNCH" : null));
       }
+      clearedDays.push(day.key);
     }
     renderTable();
     renderTotals();
-    saveState();
+    saveState(clearedDays);
     showToast(`All assignments cleared for ${MONTHS[currentMonthIdx].label}`);
   });
 
@@ -554,10 +556,14 @@ function attachEvents() {
       return;
     }
     state.members.push(clean);
-    for (const day of allWeekdays) state.assignments[day.key][clean] = slots.map((slot) => (slot.isLunch ? "LUNCH" : null));
+    const addedDays = [];
+    for (const day of allWeekdays) {
+      state.assignments[day.key][clean] = slots.map((slot) => (slot.isLunch ? "LUNCH" : null));
+      addedDays.push(day.key);
+    }
     renderTable();
     renderTotals();
-    saveState();
+    saveState(addedDays);
     showToast(`Team member "${clean}" added`);
   });
 
@@ -577,12 +583,16 @@ function attachEvents() {
     const memberName = state.members[idx];
     if (!confirm(`Remove "${memberName}" and all their assignments?`)) return;
     state.members.splice(idx, 1);
+    const affectedDays = [];
     for (const day of allWeekdays) {
-      delete state.assignments[day.key][memberName];
+      if (state.assignments[day.key][memberName]) {
+        delete state.assignments[day.key][memberName];
+        affectedDays.push(day.key);
+      }
     }
     renderTable();
     renderTotals();
-    saveState();
+    saveState(affectedDays);
     showToast(`Team member "${memberName}" removed`);
   });
 
@@ -856,16 +866,19 @@ function deleteBrand(brandId) {
 
   state.brands = state.brands.filter((b) => b.id !== brandId);
   // Remove from assignments
+  const affectedDays = [];
   for (const dayKey of Object.keys(state.assignments)) {
     const day = state.assignments[dayKey];
+    let changed = false;
     for (const member of Object.keys(day)) {
       const slots = day[member];
       if (Array.isArray(slots)) {
         for (let i = 0; i < slots.length; i++) {
-          if (slots[i] === brandId) slots[i] = null;
+          if (slots[i] === brandId) { slots[i] = null; changed = true; }
         }
       }
     }
+    if (changed) affectedDays.push(dayKey);
   }
   if (selectedBrandId === brandId) {
     selectedBrandId = state.brands.length ? state.brands[0].id : null;
@@ -873,7 +886,7 @@ function deleteBrand(brandId) {
   renderPalette();
   renderTable();
   renderTotals();
-  saveState();
+  saveState(affectedDays);
   showToast(`Brand "${brand.name}" deleted`);
 }
 
@@ -1024,7 +1037,7 @@ function openRecurringModal() {
     modal.hidden = true;
     renderTable();
     renderTotals();
-    saveState();
+    saveState(targetDays);
     showToast(`Schedule applied to ${targetDays.length} day(s), ${count} slot(s) updated`);
   };
 
