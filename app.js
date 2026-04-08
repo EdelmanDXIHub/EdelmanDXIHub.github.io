@@ -275,13 +275,12 @@ function mergeSheetIntoState(state, PRELOADED, defaultMembers) {
   }
 
   // Merge assignments from Sheet (Sheet wins over localStorage)
+  // Only import data for members that exist in state.members (_config is source of truth)
   for (const dayKey of Object.keys(PRELOADED.assignments)) {
     const sheetDay = PRELOADED.assignments[dayKey];
     state.assignments[dayKey] ||= {};
     for (const member of Object.keys(sheetDay)) {
-      if (!state.members.includes(member)) {
-        state.members.push(member);
-      }
+      if (!state.members.includes(member)) continue; // skip deleted members
       const pre = sheetDay[member];
       if (Array.isArray(pre)) {
         state.assignments[dayKey][member] = pre.map((v, i) => (lunchSlots.has(i) ? "LUNCH" : v || null));
@@ -583,16 +582,14 @@ function attachEvents() {
     const memberName = state.members[idx];
     if (!confirm(`Remove "${memberName}" and all their assignments?`)) return;
     state.members.splice(idx, 1);
-    const affectedDays = [];
     for (const day of allWeekdays) {
       if (state.assignments[day.key][memberName]) {
         delete state.assignments[day.key][memberName];
-        affectedDays.push(day.key);
       }
     }
     renderTable();
     renderTotals();
-    saveState(affectedDays);
+    saveState(); // only _config syncs (members list); orphaned assignment data is ignored on load
     showToast(`Team member "${memberName}" removed`);
   });
 
