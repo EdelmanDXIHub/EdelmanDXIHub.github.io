@@ -120,17 +120,41 @@ async function _flushPendingDays(state) {
       return;
     }
 
-    console.log("🔄 Sincronizando estado completo al Sheet...");
+    // Send _config last so day data is already written
+    days.sort((a, b) => (a === "_config" ? 1 : b === "_config" ? -1 : 0));
 
-    // Always send the FULL state via POST (avoids read-modify-write race conditions)
-    const result = await _sendFullState(state);
+    console.log("🔄 Sincronizando " + days.length + " ítem(s) al Sheet...");
 
-    if (result.ok) {
-      console.log("✅ Estado sincronizado correctamente");
-    } else {
-      console.error("⚠️ Error sincronizando: " + result.error);
+    let success = 0;
+    let lastError = null;
+    for (const day of days) {
+      let dayData;
+      if (day === "_config") {
+        dayData = { members: state.members, brands: state.brands };
+      } else {
+        dayData = state.assignments[day];
+      }
+      if (dayData) {
+        const result = await _sendDay(day, dayData);
+        if (result.ok) {
+          success++;
+        } else {
+          lastError = result.error;
+        }
+        // Small delay between requests to let Sheets propagate writes
+        if (days.length > 1) {
+          await new Promise(r => setTimeout(r, 300));
+        }
+      }
     }
-    resolvers.forEach(r => r(result.ok));
+
+    const allOk = success === days.length;
+    if (allOk) {
+      console.log("✅ " + success + "/" + days.length + " ítem(s) sincronizados");
+    } else {
+      console.error("⚠️ " + success + "/" + days.length + " OK. Error: " + lastError);
+    }
+    resolvers.forEach(r => r(allOk));
   } finally {
     _flushing = false;
     if (_pendingDays.size > 0) {
@@ -140,36 +164,14 @@ async function _flushPendingDays(state) {
   }
 }
 
-/**
- * Send the complete state as a single POST request.
- * This avoids the read-modify-write race condition that caused data loss
- * when sending individual days via GET.
- */
-async function _sendFullState(state) {
+async function _sendDay(dayKey, dayData) {
   try {
-    // Build the complete data object matching what loadDataFromSheet expects
-    const fullData = {
-      members: state.members,
-      brands: state.brands,
-      assignments: {}
-    };
+    const url = WEB_APP_URL
+      + "?action=saveDay"
+      + "&day=" + encodeURIComponent(dayKey)
+      + "&data=" + encodeURIComponent(JSON.stringify(dayData));
 
-    // Save _config inside assignments so loadDataFromSheet can read it
-    fullData.assignments._config = { members: state.members, brands: state.brands };
-
-    // Copy all assignments
-    for (const key of Object.keys(state.assignments)) {
-      fullData.assignments[key] = state.assignments[key];
-    }
-
-    const body = JSON.stringify({ action: "saveAll", data: fullData });
-    console.log("📤 Enviando " + Math.round(body.length / 1024) + "KB al Sheet...");
-
-    const response = await fetch(WEB_APP_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: body
-    });
+    const response = await fetch(url);
     const text = await response.text();
 
     try {
@@ -177,20 +179,20 @@ async function _sendFullState(state) {
       if (json.success) {
         return { ok: true };
       } else {
-        console.error("❌ Sheet respondió error:", json.error || text);
+        console.error("❌ Error para " + dayKey + ":", json.error || text);
         return { ok: false, error: json.error || "Unknown error" };
       }
     } catch {
-      console.error("❌ Respuesta no-JSON:", text.substring(0, 200));
+      console.error("❌ Respuesta no-JSON para " + dayKey + ":", text.substring(0, 200));
       return { ok: false, error: "Non-JSON response" };
     }
   } catch (error) {
-    console.error("❌ Fetch falló:", error.message);
+    console.error("❌ Fetch falló para " + dayKey + ":", error.message);
     return { ok: false, error: error.message };
   }
 }
 
-// Full sync: push complete state to Sheet
+// Full sync: push ALL current days to Sheet (one by one)
 async function fullSyncToSheet() {
   if (!WEB_APP_URL) {
     console.error("❌ Web App URL no configurada");
@@ -202,14 +204,19 @@ async function fullSyncToSheet() {
     return false;
   }
 
-  console.log("🔄 Full sync: enviando estado completo al Sheet...");
-  const result = await _sendFullState(currentState);
-  if (result.ok) {
-    console.log("✅ Full sync completado");
-  } else {
-    console.error("❌ Full sync falló: " + result.error);
+  const days = Object.keys(currentState.assignments);
+  console.log("🔄 Full sync: enviando " + days.length + " días...");
+  let success = 0;
+  for (const day of days) {
+    const result = await _sendDay(day, currentState.assignments[day]);
+    if (result.ok) success++;
+    await new Promise(r => setTimeout(r, 300));
   }
-  return result.ok;
+  // Also send _config
+  await _sendDay("_config", { members: currentState.members, brands: currentState.brands });
+
+  console.log("✅ Full sync: " + success + "/" + days.length + " días");
+  return success === days.length;
 }
 
 /**
