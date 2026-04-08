@@ -855,7 +855,6 @@ function applyTotalsCollapse(collapsed) {
 
 function applyLegendCollapse(collapsed) {
   legendPanel.classList.toggle("collapsed", collapsed);
-  layoutMain.classList.toggle("legend-collapsed", collapsed);
   toggleLegendBtn.textContent = collapsed ? "Expand" : "Collapse";
   toggleLegendBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
 }
