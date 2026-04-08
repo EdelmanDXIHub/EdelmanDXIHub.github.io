@@ -318,7 +318,7 @@ function renderTable() {
     dayRow.className = "day-header";
     const dayFirst = document.createElement("th");
     dayFirst.className = "member-head";
-    dayFirst.textContent = "Team Member (Month h)";
+    dayFirst.textContent = "Team Member";
     dayRow.appendChild(dayFirst);
 
     for (let i = 0; i < weekDays.length; i += 1) {
