@@ -78,11 +78,12 @@ async function loadDataFromSheet() {
  */
 let _pendingDays = new Set();
 let _syncTimer = null;
+let _pendingResolvers = [];
 
 function syncDataToSheet(state, changedDays) {
   if (!WEB_APP_URL) {
     console.warn("⚠️  Web App URL no configurada.");
-    return false;
+    return Promise.resolve(false);
   }
 
   if (changedDays) {
@@ -96,15 +97,22 @@ function syncDataToSheet(state, changedDays) {
   // Also sync config (members + brands) whenever state changes
   _pendingDays.add("_config");
 
+  const promise = new Promise(resolve => _pendingResolvers.push(resolve));
+
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(() => _flushPendingDays(state), 2000);
-  return true;
+  return promise;
 }
 
 async function _flushPendingDays(state) {
   const days = [..._pendingDays];
   _pendingDays.clear();
-  if (days.length === 0) return;
+  const resolvers = _pendingResolvers.splice(0);
+
+  if (days.length === 0) {
+    resolvers.forEach(r => r(true));
+    return;
+  }
 
   console.log("🔄 Sincronizando " + days.length + " ítem(s) al Sheet...");
 
@@ -127,11 +135,13 @@ async function _flushPendingDays(state) {
     }
   }
 
-  if (success === days.length) {
+  const allOk = success === days.length;
+  if (allOk) {
     console.log("✅ " + success + "/" + days.length + " día(s) sincronizados");
   } else {
     console.error("⚠️ " + success + "/" + days.length + " días OK. Error: " + lastError);
   }
+  resolvers.forEach(r => r(allOk));
 }
 
 async function _sendDayViaGet(dayKey, dayData) {

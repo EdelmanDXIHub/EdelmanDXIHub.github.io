@@ -310,10 +310,11 @@ function saveState(changedDay) {
   state.selectedBrandId = selectedBrandId;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   
-  // Sync changes to Google Sheet
+  // Sync changes to Google Sheet — returns a Promise
   if (typeof syncDataToSheet === "function") {
-    syncDataToSheet(state, changedDay);
+    return syncDataToSheet(state, changedDay);
   }
+  return Promise.resolve(true);
 }
 
 function renderPalette() {
@@ -530,7 +531,7 @@ function attachEvents() {
     updateEraserVisual();
   });
 
-  clearMonthBtn.addEventListener("click", () => {
+  clearMonthBtn.addEventListener("click", async () => {
     if (!confirm(`Clear all assignments for ${MONTHS[currentMonthIdx].label}?`)) return;
     const clearedDays = [];
     for (const day of weekdays) {
@@ -542,11 +543,11 @@ function attachEvents() {
     }
     renderTable();
     renderTotals();
-    saveState(clearedDays);
-    showToast(`All assignments cleared for ${MONTHS[currentMonthIdx].label}`);
+    const ok = await saveState(clearedDays);
+    showToast(ok ? `All assignments cleared for ${MONTHS[currentMonthIdx].label}` : "Sync failed — changes saved locally", ok ? "success" : "error");
   });
 
-  addMemberBtn.addEventListener("click", () => {
+  addMemberBtn.addEventListener("click", async () => {
     const name = prompt("New team member name:");
     if (!name || !name.trim()) return;
     const clean = name.trim();
@@ -562,11 +563,11 @@ function attachEvents() {
     }
     renderTable();
     renderTotals();
-    saveState(addedDays);
-    showToast(`Team member "${clean}" added`);
+    const ok = await saveState(addedDays);
+    showToast(ok ? `Team member "${clean}" added` : "Sync failed — changes saved locally", ok ? "success" : "error");
   });
 
-  removeMemberBtn.addEventListener("click", () => {
+  removeMemberBtn.addEventListener("click", async () => {
     if (state.members.length === 0) {
       alert("No team members to remove.");
       return;
@@ -589,8 +590,8 @@ function attachEvents() {
     }
     renderTable();
     renderTotals();
-    saveState(); // only _config syncs (members list); orphaned assignment data is ignored on load
-    showToast(`Team member "${memberName}" removed`);
+    const ok = await saveState();
+    showToast(ok ? `Team member "${memberName}" removed` : "Sync failed — changes saved locally", ok ? "success" : "error");
   });
 
   addBrandBtn.addEventListener("click", async () => {
@@ -602,8 +603,8 @@ function attachEvents() {
     paintMode = "brand";
     renderPalette();
     renderTable();
-    saveState();
-    showToast(`Brand "${result.name}" added`);
+    const ok = await saveState();
+    showToast(ok ? `Brand "${result.name}" added` : "Sync failed — changes saved locally", ok ? "success" : "error");
   });
 
   exportExcelBtn.addEventListener("click", async () => {
@@ -852,11 +853,11 @@ async function editBrand(brandId) {
   renderPalette();
   renderTable();
   renderTotals();
-  saveState();
-  showToast(`Brand "${result.name}" updated`);
+  const ok = await saveState();
+  showToast(ok ? `Brand "${result.name}" updated` : "Sync failed — changes saved locally", ok ? "success" : "error");
 }
 
-function deleteBrand(brandId) {
+async function deleteBrand(brandId) {
   const brand = state.brands.find((b) => b.id === brandId);
   if (!brand) return;
   if (!confirm(`Delete brand "${brand.name}"? Assignments using this brand will be cleared.`)) return;
@@ -883,8 +884,8 @@ function deleteBrand(brandId) {
   renderPalette();
   renderTable();
   renderTotals();
-  saveState(affectedDays);
-  showToast(`Brand "${brand.name}" deleted`);
+  const ok = await saveState(affectedDays);
+  showToast(ok ? `Brand "${brand.name}" deleted` : "Sync failed — changes saved locally", ok ? "success" : "error");
 }
 
 function openBrandModal(title, name, color) {
@@ -993,7 +994,7 @@ function openRecurringModal() {
   document.getElementById("recCancel").onclick = () => { modal.hidden = true; };
 
   // Apply
-  document.getElementById("recApply").onclick = () => {
+  document.getElementById("recApply").onclick = async () => {
     const member = memberSel.value;
     const brandId = brandSel.value;
     const startIdx = Number(startSel.value);
@@ -1034,8 +1035,8 @@ function openRecurringModal() {
     modal.hidden = true;
     renderTable();
     renderTotals();
-    saveState(targetDays);
-    showToast(`Schedule applied to ${targetDays.length} day(s), ${count} slot(s) updated`);
+    const ok = await saveState(targetDays);
+    showToast(ok ? `Schedule applied to ${targetDays.length} day(s), ${count} slot(s) updated` : "Sync failed — changes saved locally", ok ? "success" : "error");
   };
 
   modal.hidden = false;
