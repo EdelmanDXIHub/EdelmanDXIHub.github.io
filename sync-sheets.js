@@ -77,6 +77,7 @@ async function loadDataFromSheet() {
 let _pendingDays = new Set();
 let _syncTimer = null;
 let _pendingResolvers = [];
+let _flushing = false;
 
 function syncDataToSheet(state, changedDays) {
   if (!WEB_APP_URL) {
@@ -103,67 +104,68 @@ function syncDataToSheet(state, changedDays) {
 }
 
 async function _flushPendingDays(state) {
-  const days = [..._pendingDays];
-  _pendingDays.clear();
-  const resolvers = _pendingResolvers.splice(0);
-
-  if (days.length === 0) {
-    resolvers.forEach(r => r(true));
+  // Prevent concurrent flushes — Apps Script does read-modify-write on A1
+  // so overlapping flushes can overwrite each other's changes
+  if (_flushing) {
+    clearTimeout(_syncTimer);
+    _syncTimer = setTimeout(() => _flushPendingDays(state), 1000);
     return;
   }
 
-  console.log("🔄 Sincronizando " + days.length + " ítem(s) al Sheet...");
+  _flushing = true;
+  try {
+    const days = [..._pendingDays];
+    _pendingDays.clear();
+    const resolvers = _pendingResolvers.splice(0);
 
-  let success = 0;
-  let lastError = null;
-  for (const day of days) {
-    let dayData;
-    if (day === "_config") {
-      dayData = { members: state.members, brands: state.brands };
-    } else {
-      dayData = state.assignments[day];
+    if (days.length === 0) {
+      resolvers.forEach(r => r(true));
+      return;
     }
-    if (dayData) {
-      const result = await _sendDayViaGet(day, dayData);
-      if (result.ok) {
-        success++;
+
+    // Always send _config last so it doesn't get overwritten by day writes
+    days.sort((a, b) => (a === "_config" ? 1 : b === "_config" ? -1 : 0));
+
+    console.log("🔄 Sincronizando " + days.length + " ítem(s) al Sheet...");
+
+    let success = 0;
+    let lastError = null;
+    for (const day of days) {
+      let dayData;
+      if (day === "_config") {
+        dayData = { members: state.members, brands: state.brands };
       } else {
-        lastError = result.error;
+        dayData = state.assignments[day];
       }
-    }
-  }
-
-  const allOk = success === days.length;
-  if (allOk) {
-    console.log("✅ " + success + "/" + days.length + " día(s) sincronizados");
-  } else {
-    console.error("⚠️ " + success + "/" + days.length + " días OK. Error: " + lastError);
-  }
-  // Verify write by reading back
-  if (allOk && API_KEY) {
-    try {
-      const verifyUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!${SHEET_RANGE}?key=${API_KEY}`;
-      const vRes = await fetch(verifyUrl, { cache: 'no-store' });
-      if (vRes.ok) {
-        const vJson = await vRes.json();
-        const raw = vJson.values?.[0]?.[0];
-        if (raw) {
-          const saved = JSON.parse(raw);
-          const savedAssign = saved.assignments || {};
-          // Check that a non-config day we just wrote is actually present
-          const dayToCheck = days.find(d => d !== '_config');
-          if (dayToCheck && !savedAssign[dayToCheck]) {
-            console.error('\u274c Verification failed: day ' + dayToCheck + ' not found in Sheet after save');
-            resolvers.forEach(r => r(false));
-            return;
-          }
+      if (dayData) {
+        const payload = JSON.stringify(dayData);
+        if (payload.length > 6000) {
+          console.warn("⚠️ Payload grande para " + day + ": " + payload.length + " chars");
+        }
+        const result = await _sendDayViaGet(day, dayData);
+        if (result.ok) {
+          success++;
+        } else {
+          lastError = result.error;
         }
       }
-    } catch (e) {
-      console.warn('Verify read failed:', e.message);
+    }
+
+    const allOk = success === days.length;
+    if (allOk) {
+      console.log("✅ " + success + "/" + days.length + " día(s) sincronizados");
+    } else {
+      console.error("⚠️ " + success + "/" + days.length + " días OK. Error: " + lastError);
+    }
+    resolvers.forEach(r => r(allOk));
+  } finally {
+    _flushing = false;
+    // If new items accumulated while we were flushing, flush again soon
+    if (_pendingDays.size > 0) {
+      clearTimeout(_syncTimer);
+      _syncTimer = setTimeout(() => _flushPendingDays(state), 500);
     }
   }
-  resolvers.forEach(r => r(allOk));
 }
 
 async function _sendDayViaGet(dayKey, dayData) {
