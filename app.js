@@ -848,7 +848,6 @@ function openBrandModal(title, name, color) {
 
 function applyTotalsCollapse(collapsed) {
   totalsPanel.classList.toggle("collapsed", collapsed);
-  layoutMain.classList.toggle("totals-collapsed", collapsed);
   toggleTotalsBtn.textContent = collapsed ? "Expand" : "Collapse";
   toggleTotalsBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
 }
