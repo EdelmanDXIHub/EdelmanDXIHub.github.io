@@ -860,8 +860,8 @@ function applyLegendCollapse(collapsed) {
 }
 
 function updateEraserVisual() {
-  eraserBtn.style.borderColor = paintMode === "erase" ? "#0d7a5f" : "#d8dfd9";
-  eraserBtn.style.background = paintMode === "erase" ? "#e6f4ef" : "#f9fcfa";
+  eraserBtn.style.borderColor = paintMode === "erase" ? "#0E75FF" : "#E0E0E0";
+  eraserBtn.style.background = paintMode === "erase" ? "#EBF3FF" : "#FAFAFA";
 }
 
 function toLabel(hour, minute) {
