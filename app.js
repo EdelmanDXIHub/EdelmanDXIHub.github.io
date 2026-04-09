@@ -758,7 +758,7 @@ async function exportScheduleToNewExcel() {
     sheet.cell("A4").value("Team Member").style("bold", true).style("fill", "D3D3D3");
     sheet.cell("B4").value("Client").style("bold", true).style("fill", "D3D3D3");
     for (let i = 0; i < monthLabels.length; i++) {
-      sheet.cell(i + 3, 4).value(`${monthLabels[i]} Hours`).style("bold", true).style("fill", "D3D3D3");
+      sheet.cell(4, i + 3).value(`${monthLabels[i]} Hours`).style("bold", true).style("fill", "D3D3D3");
     }
 
     // Set column widths
@@ -794,11 +794,6 @@ async function exportScheduleToNewExcel() {
       for (const [brandId, brand] of memberBrands) {
         sheet.cell(`A${rowNum}`).value(member);
         sheet.cell(`B${rowNum}`).value(brand?.name || "");
-        if (brand) {
-          const cellB = sheet.cell(`B${rowNum}`);
-          applyFillColor(cellB, brand.color);
-          cellB.style("fontColor", "000000");
-        }
 
         // Calculate hours for each month
         for (let mIdx = 0; mIdx < MONTHS.length; mIdx++) {
