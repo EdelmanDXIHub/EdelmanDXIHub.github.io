@@ -251,46 +251,16 @@ async function _sendFullState(state) {
   const jsonStr = JSON.stringify(_compressData(fullData));
   console.log("📤 Datos: " + Math.round(jsonStr.length / 1024) + "KB (comprimido)");
 
-  // Apps Script 302-redirects POST→GET (loses body), so skip POST entirely.
-  // Use GET chunking which works reliably.
-  return await _sendViaGetChunked(jsonStr);
+  // Send as a single GET request (compressed data is small enough).
+  return await _sendGetSaveAll(jsonStr);
 }
 
-
-/**
- * Send data via GET in chunks.
- * Each chunk writes to PropertiesService; the last chunk triggers assembly + save.
- */
-async function _sendViaGetChunked(jsonStr) {
-  // After URL-encoding, JSON chars like {, ", : expand ~2x.
-  // Keep raw chunk at 1500 chars so encoded URL stays well under 4000 chars total.
-  const CHUNK_SIZE = 1500;
-  const totalChunks = Math.ceil(jsonStr.length / CHUNK_SIZE);
-
-  if (totalChunks === 1) {
-    // Small enough to send in one GET
-    return await _sendGetSaveAll(jsonStr, 0, 1);
-  }
-
-  console.log("📦 Enviando en " + totalChunks + " partes...");
-  for (let i = 0; i < totalChunks; i++) {
-    const chunk = jsonStr.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-    const result = await _sendGetSaveAll(chunk, i, totalChunks);
-    if (!result.ok) return result;
-    // Small delay between chunks
-    if (i < totalChunks - 1) {
-      await new Promise(r => setTimeout(r, 200));
-    }
-  }
-  return { ok: true };
-}
-
-async function _sendGetSaveAll(data, chunkIndex, totalChunks) {
+async function _sendGetSaveAll(data) {
   try {
     const url = WEB_APP_URL
       + "?action=saveAllChunk"
-      + "&chunk=" + chunkIndex
-      + "&total=" + totalChunks
+      + "&chunk=0"
+      + "&total=1"
       + "&data=" + encodeURIComponent(data);
 
     // Use redirect:'manual' so we intercept Apps Script's 302 redirect instead of
