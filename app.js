@@ -421,7 +421,7 @@ function renderTable() {
       const th = document.createElement("th");
       th.colSpan = slots.length;
       if (isHoliday(day.key)) {
-        th.textContent = `${day.label} H`;
+        th.textContent = `${day.label} (Holiday)`;
         th.classList.add("holiday-day");
         th.style.background = "#fcc4d6";
         th.title = COLOMBIAN_HOLIDAYS[day.key];
@@ -487,7 +487,7 @@ function renderTable() {
             td.style.background = "#fcc4d6";
             td.style.cursor = "not-allowed";
             td.title = `Holiday: ${COLOMBIAN_HOLIDAYS[day.key]}`;
-            td.textContent = "H";
+            td.textContent = "";
           } else if (slot.isLunch) {
             td.classList.add("lunch");
             td.textContent = "L";
