@@ -251,37 +251,40 @@ async function _sendFullState(state) {
   const jsonStr = JSON.stringify(_compressData(fullData));
   console.log("📤 Datos: " + Math.round(jsonStr.length / 1024) + "KB (comprimido)");
 
-  // Split into 1000-char chunks. After URL-encoding, each chunk becomes ~3000 chars,
-  // keeping total URL well under Apps Script's limit.
   const CHUNK_SIZE = 1000;
   const totalChunks = Math.ceil(jsonStr.length / CHUNK_SIZE);
 
-  for (let i = 0; i < totalChunks; i++) {
-    const chunk = jsonStr.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-    const result = await _sendGetSaveAll(chunk, i, totalChunks);
-    if (!result.ok) return result;
-    // Brief pause between chunks to avoid overwhelming PropertiesService
-    if (i < totalChunks - 1) {
-      await new Promise(r => setTimeout(r, 300));
+  // Retry the full send+verify cycle up to 3 times
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) {
+      console.log("🔄 Reintento " + attempt + "/2...");
+      await new Promise(r => setTimeout(r, 1500));
     }
+
+    // Use a unique batch ID so the Apps Script can discard stale chunks
+    // from any previous failed/partial sync
+    const batchId = Date.now().toString();
+
+    let sendOk = true;
+    for (let i = 0; i < totalChunks; i++) {
+      const chunk = jsonStr.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+      const result = await _sendGetSaveAll(chunk, i, totalChunks, batchId);
+      if (!result.ok) { sendOk = false; break; }
+      if (i < totalChunks - 1) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    if (!sendOk) continue;
+
+    // Wait for Apps Script to flush PropertiesService assembly and write to Sheet
+    await new Promise(r => setTimeout(r, 4000));
+    const verified = await _verifySheetSave(jsonStr);
+    if (verified) return { ok: true };
+    console.warn("⚠️ Verificación falló (intento " + (attempt + 1) + "/3)");
   }
 
-  // Verify that the data was actually written to the Sheet.
-  // opaqueredirect only confirms HTTP delivery — not that Apps Script wrote to Sheets.
-  // Wait for Apps Script to finish, then read back and compare actual slot count.
-  await new Promise(r => setTimeout(r, 2500));
-  let verified = await _verifySheetSave(jsonStr);
-  if (!verified) {
-    // Sheets API may have stale cache — retry once after extra wait
-    console.warn("⚠️ Primer intento de verificación falló, reintentando...");
-    await new Promise(r => setTimeout(r, 3000));
-    verified = await _verifySheetSave(jsonStr);
-  }
-  if (!verified) {
-    console.error("⚠️ Verificación falló: el Sheet no refleja los datos enviados");
-    return { ok: false, error: "Verification failed" };
-  }
-  return { ok: true };
+  return { ok: false, error: "Verification failed after 3 attempts" };
 }
 
 function _countAssignedSlots(data) {
@@ -322,10 +325,11 @@ async function _verifySheetSave(expectedJsonStr) {
   }
 }
 
-async function _sendGetSaveAll(data, chunkIndex, totalChunks) {
+async function _sendGetSaveAll(data, chunkIndex, totalChunks, batchId) {
   try {
     const url = WEB_APP_URL
       + "?action=saveAllChunk"
+      + "&batch=" + encodeURIComponent(batchId)
       + "&chunk=" + chunkIndex
       + "&total=" + totalChunks
       + "&data=" + encodeURIComponent(data);
