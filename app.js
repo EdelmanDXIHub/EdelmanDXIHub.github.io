@@ -55,6 +55,33 @@ const MONTHS = [
 ];
 let currentMonthIdx = 3;
 
+// Colombian holidays 2026 (blocking dates - no editing allowed)
+const COLOMBIAN_HOLIDAYS = {
+  "2026-01-01": "Año Nuevo",
+  "2026-01-08": "Reyes",
+  "2026-02-09": "Lunes de Carnaval",
+  "2026-02-10": "Martes de Carnaval",
+  "2026-02-25": "Miércoles de Ceniza",
+  "2026-03-19": "San José",
+  "2026-04-09": "Jueves Santo",
+  "2026-04-10": "Viernes Santo",
+  "2026-05-01": "Día del Trabajo",
+  "2026-05-30": "Corpus Christi",
+  "2026-06-19": "Sagrado Corazón",
+  "2026-06-29": "San Pedro y San Pablo",
+  "2026-08-07": "Batalla de Boyacá",
+  "2026-08-15": "Asunción de María",
+  "2026-10-12": "Día de la Raza",
+  "2026-11-01": "Todos los Santos",
+  "2026-11-11": "Independencia de Cartagena",
+  "2026-12-08": "Inmaculada Concepción",
+  "2026-12-25": "Navidad",
+};
+
+function isHoliday(dateKey) {
+  return COLOMBIAN_HOLIDAYS.hasOwnProperty(dateKey);
+}
+
 const slots = buildSlots();
 const lunchSlots = new Set(slots.filter((s) => s.isLunch).map((s) => s.index));
 
@@ -396,8 +423,15 @@ function renderTable() {
       const day = weekDays[i];
       const th = document.createElement("th");
       th.colSpan = slots.length;
-      th.textContent = day.label;
-      if (day.foreign) th.classList.add("foreign-day");
+      if (isHoliday(day.key)) {
+        th.textContent = `${day.label} 🔒`;
+        th.classList.add("holiday-day");
+        th.style.background = "#fcc4d6";
+        th.title = COLOMBIAN_HOLIDAYS[day.key];
+      } else {
+        th.textContent = day.label;
+        if (day.foreign) th.classList.add("foreign-day");
+      }
       dayRow.appendChild(th);
       if (i < weekDays.length - 1) {
         const gap = document.createElement("th");
@@ -417,7 +451,8 @@ function renderTable() {
       for (const slot of slots) {
         const th = document.createElement("th");
         th.textContent = compactSlotLabel(slot);
-        if (weekDays[i].foreign) th.style.background = "#f0f2f1";
+        if (isHoliday(weekDays[i].key)) th.style.background = "#fcc4d6";
+        else if (weekDays[i].foreign) th.style.background = "#f0f2f1";
         else if (slot.isLunch) th.style.background = "#e3e8e4";
         slotRow.appendChild(th);
       }
@@ -444,9 +479,18 @@ function renderTable() {
           td.dataset.member = member;
           td.dataset.slot = String(slot.index);
           td.dataset.day = day.key;
+          
+          const dayIsHoliday = isHoliday(day.key);
+          
           if (day.foreign) {
             td.classList.add("foreign");
             td.style.background = "#f0f2f1";
+          } else if (dayIsHoliday) {
+            td.classList.add("holiday");
+            td.style.background = "#fcc4d6";
+            td.style.cursor = "not-allowed";
+            td.title = "Día festivo - No se puede editar";
+            td.textContent = "🔒";
           } else if (slot.isLunch) {
             td.classList.add("lunch");
             td.textContent = "L";
@@ -490,7 +534,7 @@ function renderTotals() {
   for (const member of state.members) {
     let memberHalfHours = 0;
     for (const day of weekdays) {
-      if (day.foreign) continue;
+      if (day.foreign || isHoliday(day.key)) continue;
       const arr = state.assignments[day.key][member];
       for (let i = 0; i < arr.length; i += 1) {
         const value = arr[i];
@@ -522,7 +566,7 @@ function renderTotalList(items, emptyText) {
 function memberMonthHours(member) {
   let hh = 0;
   for (const day of weekdays) {
-    if (day.foreign) continue;
+    if (day.foreign || isHoliday(day.key)) continue;
     const arr = state.assignments[day.key][member];
     for (let i = 0; i < arr.length; i += 1) {
       if (lunchSlots.has(i)) continue;
@@ -562,7 +606,7 @@ function attachEvents() {
     if (!confirm(`Clear all assignments for ${MONTHS[currentMonthIdx].label}?`)) return;
     const clearedDays = [];
     for (const day of weekdays) {
-      if (day.foreign) continue;
+      if (day.foreign || isHoliday(day.key)) continue;
       for (const member of state.members) {
         state.assignments[day.key][member] = slots.map((slot) => (slot.isLunch ? "LUNCH" : null));
       }
@@ -648,7 +692,7 @@ function attachEvents() {
 
   scheduleBody.addEventListener("mousedown", (event) => {
     const cell = event.target.closest(".slot-cell");
-    if (!cell || cell.classList.contains("lunch") || cell.classList.contains("foreign")) return;
+    if (!cell || cell.classList.contains("lunch") || cell.classList.contains("foreign") || cell.classList.contains("holiday")) return;
     isMouseDown = true;
     const member = cell.dataset.member;
     const dayKey = cell.dataset.day;
@@ -661,7 +705,7 @@ function attachEvents() {
   scheduleBody.addEventListener("mouseover", (event) => {
     if (!isMouseDown) return;
     const cell = event.target.closest(".slot-cell");
-    if (!cell || cell.classList.contains("lunch") || cell.classList.contains("foreign")) return;
+    if (!cell || cell.classList.contains("lunch") || cell.classList.contains("foreign") || cell.classList.contains("holiday")) return;
     const member = cell.dataset.member;
     const dayKey = cell.dataset.day;
     const slotIndex = Number(cell.dataset.slot);
