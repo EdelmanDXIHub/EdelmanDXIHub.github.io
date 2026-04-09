@@ -467,7 +467,7 @@ function renderTable() {
       const tr = document.createElement("tr");
       const memberCell = document.createElement("td");
       memberCell.className = "member-cell";
-      memberCell.textContent = `${member} (${memberMonthHours(member).toFixed(1)}h)`;
+      memberCell.textContent = `${member} (${memberWeekHours(member, w).toFixed(1)}h)`;
       tr.appendChild(memberCell);
 
       for (let i = 0; i < weekDays.length; i += 1) {
@@ -565,6 +565,20 @@ function renderTotalList(items, emptyText) {
 function memberMonthHours(member) {
   let hh = 0;
   for (const day of weekdays) {
+    if (day.foreign || isHoliday(day.key)) continue;
+    const arr = state.assignments[day.key][member];
+    for (let i = 0; i < arr.length; i += 1) {
+      if (lunchSlots.has(i)) continue;
+      if (arr[i]) hh += 1;
+    }
+  }
+  return hh * 0.5;
+}
+
+function memberWeekHours(member, weekIndex) {
+  let hh = 0;
+  const weekDays = weeks[weekIndex] || [];
+  for (const day of weekDays) {
     if (day.foreign || isHoliday(day.key)) continue;
     const arr = state.assignments[day.key][member];
     for (let i = 0; i < arr.length; i += 1) {
