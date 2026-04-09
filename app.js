@@ -744,10 +744,6 @@ async function exportScheduleToNewExcel() {
     const sheet = workbook.sheet(0);
     sheet.name("Summary");
 
-    // Create header
-    sheet.cell("A1").value("DXI Timing Map - Summary by Client").style("bold", true).style("fontSize", 14);
-    sheet.cell("A2").value(`Export Date: ${todayStamp()}`).style("italic", true);
-
     // Build column headers: Team Member, Client, then "MonthName Hours" for each month
     const monthLabels = MONTHS.map(m => {
       const date = new Date(m.year, m.month, 1);
@@ -755,10 +751,10 @@ async function exportScheduleToNewExcel() {
       return monthName;
     });
 
-    sheet.cell("A4").value("Team Member").style("bold", true).style("fill", "D3D3D3");
-    sheet.cell("B4").value("Client").style("bold", true).style("fill", "D3D3D3");
+    sheet.cell("A1").value("Team Member").style("bold", true).style("fill", "D3D3D3");
+    sheet.cell("B1").value("Client").style("bold", true).style("fill", "D3D3D3");
     for (let i = 0; i < monthLabels.length; i++) {
-      sheet.cell(4, i + 3).value(`${monthLabels[i]} Hours`).style("bold", true).style("fill", "D3D3D3");
+      sheet.cell(1, i + 3).value(`${monthLabels[i]} Hours`).style("bold", true).style("fill", "D3D3D3");
     }
 
     // Set column widths
@@ -768,7 +764,7 @@ async function exportScheduleToNewExcel() {
       sheet.column(i + 3).width(12);
     }
 
-    let rowNum = 5;
+    let rowNum = 2;
     const brandById = new Map(state.brands.map((b) => [b.id, b]));
 
     // For each team member
