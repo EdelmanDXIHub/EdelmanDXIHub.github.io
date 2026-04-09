@@ -1,3 +1,28 @@
+// Safe localStorage wrapper (handles Firefox tracking prevention, private mode, etc.)
+const safeStorage = {
+  getItem: function(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      return null;
+    }
+  },
+  setItem: function(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      // Silent fail - data goes to Sheet, doesn't need local cache
+    }
+  },
+  removeItem: function(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      // Silent fail
+    }
+  }
+};
+
 const STORAGE_KEY = "dxi-timing-map-2026-v13";
 
 const fallbackColors = ["#2D6A4F", "#1D3557", "#8F2D56", "#CA6702", "#6A4C93", "#264653", "#386641", "#9D4EDD"];
@@ -116,8 +141,8 @@ function init() {
 
   renderMonthTabs();
   updateScheduleTitle();
-  applyTotalsCollapse(localStorage.getItem("dxi-totals-collapsed") === "1");
-  applyLegendCollapse(localStorage.getItem("dxi-legend-collapsed") === "1");
+  applyTotalsCollapse(safeStorage.getItem("dxi-totals-collapsed") === "1");
+  applyLegendCollapse(safeStorage.getItem("dxi-legend-collapsed") === "1");
   renderPalette();
   renderTable();
   renderTotals();
@@ -244,7 +269,7 @@ function createInitialState(defaultMembers, defaultBrands, PRELOADED) {
 
 function loadStateFromStorage(defaultBrands) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = safeStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.members || !parsed?.brands || !parsed?.assignments) return null;
@@ -308,7 +333,7 @@ function mergeSheetIntoState(state, PRELOADED, defaultMembers) {
 
 function saveState(changedDay) {
   state.selectedBrandId = selectedBrandId;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  safeStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   
   // Sync changes to Google Sheet — returns a Promise
   if (typeof syncDataToSheet === "function") {
@@ -519,13 +544,13 @@ function attachEvents() {
   toggleTotalsBtn.addEventListener("click", () => {
     const collapsed = !totalsPanel.classList.contains("collapsed");
     applyTotalsCollapse(collapsed);
-    localStorage.setItem("dxi-totals-collapsed", collapsed ? "1" : "0");
+    safeStorage.setItem("dxi-totals-collapsed", collapsed ? "1" : "0");
   });
 
   toggleLegendBtn.addEventListener("click", () => {
     const collapsed = !legendPanel.classList.contains("collapsed");
     applyLegendCollapse(collapsed);
-    localStorage.setItem("dxi-legend-collapsed", collapsed ? "1" : "0");
+    safeStorage.setItem("dxi-legend-collapsed", collapsed ? "1" : "0");
   });
 
   eraserBtn.addEventListener("click", () => {
