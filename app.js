@@ -1062,7 +1062,7 @@ function openRecurringModal() {
     let count = 0;
     for (const dayKey of targetDays) {
       if (!state.assignments[dayKey]?.[member]) continue;
-      for (let i = startIdx; i <= endIdx; i += 1) {
+      for (let i = startIdx; i < endIdx; i += 1) {
         if (lunchSlots.has(i)) continue;
         state.assignments[dayKey][member][i] = brandId;
         count += 1;
