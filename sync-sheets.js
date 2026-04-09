@@ -262,8 +262,8 @@ async function _sendFullState(state) {
  * Each chunk writes to PropertiesService; the last chunk triggers assembly + save.
  */
 async function _sendViaGetChunked(jsonStr) {
-  // Keep chunks small: URL-encoding expands data ~2-3x; Google redirect URL has ~8KB limit
-  const CHUNK_SIZE = 1500;
+  // Google Apps Script GET URLs can safely handle ~6000 chars of encoded data
+  const CHUNK_SIZE = 5000;
   const totalChunks = Math.ceil(jsonStr.length / CHUNK_SIZE);
 
   if (totalChunks === 1) {
@@ -292,7 +292,13 @@ async function _sendGetSaveAll(data, chunkIndex, totalChunks) {
       + "&total=" + totalChunks
       + "&data=" + encodeURIComponent(data);
 
-    const response = await fetch(url);
+    // Use redirect:'manual' so we intercept Apps Script's 302 redirect instead of
+    // following it to the echo URL (which returns 400 due to CORS/URL issues).
+    // An opaqueredirect means Apps Script received and processed the request successfully.
+    const response = await fetch(url, { redirect: "manual" });
+    if (response.type === "opaqueredirect") {
+      return { ok: true };
+    }
     const text = await response.text();
     try {
       const json = JSON.parse(text);
