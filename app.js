@@ -217,7 +217,7 @@ function updateScheduleTitle() {
 function buildSlots() {
   const built = [];
   let idx = 0;
-  for (let hour = 7; hour < 17; hour += 1) {
+  for (let hour = 7; hour <= 17; hour += 1) {
     for (const minute of [0, 30]) {
       built.push({ index: idx, label: toLabel(hour, minute), hour, minute, isLunch: hour === 13 });
       idx += 1;
@@ -1034,7 +1034,9 @@ function openRecurringModal() {
     .join("");
   startSel.innerHTML = timeOptions;
   endSel.innerHTML = timeOptions;
-  // Default end to last slot
+  // Default start to 8:00 (index 2: 7:00=0, 7:30=1, 8:00=2)
+  startSel.value = "2";
+  // Default end to last slot (17:00)
   if (slots.length) endSel.value = String(slots[slots.length - 1].index);
 
   // Populate weeks
