@@ -84,7 +84,7 @@ let _postWorks = null; // null = untested, true/false = tested
  * Compress assignments before saving to Sheets.
  * Skips empty member-days (all null/LUNCH) and encodes slot arrays as compact strings.
  * Reduces size from ~163KB to ~5-10KB, well under the 50,000-char Sheets cell limit.
- *   null → '.'   LUNCH → 'L'   bN → base-36 digit (1→'1', 10→'a', ...)
+ *   null → '.'   LUNCH → 'L'   brandId → 'Bn' (e.g., 'B0', 'B1', 'B2')
  */
 function _compressData(data) {
   const out = {
@@ -93,6 +93,14 @@ function _compressData(data) {
     brands: data.brands,
     assignments: {}
   };
+
+  // Build brand ID → index map
+  const brandMap = {};
+  if (Array.isArray(data.brands)) {
+    for (let i = 0; i < data.brands.length; i++) {
+      brandMap[data.brands[i].id] = 'B' + i;
+    }
+  }
 
   for (const day of Object.keys(data.assignments)) {
     if (day === '_config') {
@@ -111,8 +119,7 @@ function _compressData(data) {
       compDay[member] = slots.map(v => {
         if (v === null || v === undefined) return '.';
         if (v === 'LUNCH') return 'L';
-        const n = parseInt(v.substring(1));
-        return isNaN(n) ? '.' : n.toString(36);
+        return brandMap[v] || '.';
       }).join('');
     }
     if (Object.keys(compDay).length > 0) {
@@ -133,6 +140,15 @@ function _decompressData(data) {
     brands: data.brands || [],
     assignments: {}
   };
+  
+  // Build brand index → ID map
+  const brandIds = {};
+  if (Array.isArray(data.brands)) {
+    for (let i = 0; i < data.brands.length; i++) {
+      brandIds['B' + i] = data.brands[i].id;
+    }
+  }
+
   for (const day of Object.keys(data.assignments)) {
     if (day === '_config') {
       out.assignments._config = data.assignments._config;
@@ -145,8 +161,8 @@ function _decompressData(data) {
       out.assignments[day][member] = val.split('').map(c => {
         if (c === '.') return null;
         if (c === 'L') return 'LUNCH';
-        const n = parseInt(c, 36);
-        return isNaN(n) ? null : 'b' + n.toString();
+        // c is like 'B0', 'B1', etc.
+        return brandIds[c] || null;
       });
     }
   }
