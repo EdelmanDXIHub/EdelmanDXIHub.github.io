@@ -78,7 +78,6 @@ let _pendingDays = new Set();
 let _syncTimer = null;
 let _pendingResolvers = [];
 let _flushing = false;
-let _postWorks = null; // null = untested, true/false = tested
 
 /**
  * Compress assignments before saving to Sheets.
@@ -252,45 +251,14 @@ async function _sendFullState(state) {
   const jsonStr = JSON.stringify(_compressData(fullData));
   console.log("📤 Datos: " + Math.round(jsonStr.length / 1024) + "KB (comprimido)");
 
-  // Try POST if not known to fail
-  if (_postWorks !== false) {
-    const postResult = await _tryPost(jsonStr);
-    if (postResult.ok) {
-      _postWorks = true;
-      return postResult;
-    }
-    console.warn("⚠️ POST falló, intentando GET...");
-    _postWorks = false;
-  }
-
-  // Fallback: GET-based full save using saveAll action with chunked data
+  // Apps Script 302-redirects POST→GET (loses body), so skip POST entirely.
+  // Use GET chunking which works reliably.
   return await _sendViaGetChunked(jsonStr);
 }
 
-async function _tryPost(jsonStr) {
-  try {
-    const body = JSON.stringify({ action: "saveAll", data: JSON.parse(jsonStr) });
-    const response = await fetch(WEB_APP_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: body
-    });
-    const text = await response.text();
-    try {
-      const json = JSON.parse(text);
-      if (json.success) return { ok: true };
-      if (json.error === "Invalid action") return { ok: false, error: "POST not supported" };
-      return { ok: false, error: json.error || "Unknown" };
-    } catch {
-      return { ok: false, error: "Non-JSON response" };
-    }
-  } catch (error) {
-    return { ok: false, error: error.message };
-  }
-}
 
 /**
- * Fallback: send data via GET in chunks.
+ * Send data via GET in chunks.
  * Each chunk writes to PropertiesService; the last chunk triggers assembly + save.
  */
 async function _sendViaGetChunked(jsonStr) {
