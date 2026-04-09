@@ -742,80 +742,84 @@ async function exportScheduleToNewExcel() {
 
     const workbook = await window.XlsxPopulate.fromBlankAsync();
     const sheet = workbook.sheet(0);
-    sheet.name("Schedule");
+    sheet.name("Summary");
 
     // Create header
-    sheet.cell("A1").value(`DXI Timing Map - ${MONTHS[currentMonthIdx].label}`).style("bold", true).style("fontSize", 14);
+    sheet.cell("A1").value("DXI Timing Map - Summary by Client").style("bold", true).style("fontSize", 14);
     sheet.cell("A2").value(`Export Date: ${todayStamp()}`).style("italic", true);
 
-    // Column headers
+    // Build column headers: Team Member, Client, then "MonthName Hours" for each month
+    const monthLabels = MONTHS.map(m => {
+      const date = new Date(m.year, m.month, 1);
+      const monthName = date.toLocaleDateString("en-US", { month: "short" });
+      return monthName;
+    });
+
     sheet.cell("A4").value("Team Member").style("bold", true).style("fill", "D3D3D3");
-    sheet.cell("B4").value("Date").style("bold", true).style("fill", "D3D3D3");
-    sheet.cell("C4").value("Time Range").style("bold", true).style("fill", "D3D3D3");
-    sheet.cell("D4").value("Hours").style("bold", true).style("fill", "D3D3D3");
-    sheet.cell("E4").value("Brand Assigned").style("bold", true).style("fill", "D3D3D3");
+    sheet.cell("B4").value("Client").style("bold", true).style("fill", "D3D3D3");
+    for (let i = 0; i < monthLabels.length; i++) {
+      sheet.cell(i + 3, 4).value(`${monthLabels[i]} Hours`).style("bold", true).style("fill", "D3D3D3");
+    }
 
     // Set column widths
     sheet.column("A").width(25);
-    sheet.column("B").width(15);
-    sheet.column("C").width(22);
-    sheet.column("D").width(8);
-    sheet.column("E").width(35);
+    sheet.column("B").width(35);
+    for (let i = 0; i < monthLabels.length; i++) {
+      sheet.column(i + 3).width(12);
+    }
 
     let rowNum = 5;
     const brandById = new Map(state.brands.map((b) => [b.id, b]));
 
-    // Iterate through each team member
+    // For each team member
     for (const member of state.members) {
-      // Iterate through each weekday
-      for (const weekday of weekdays) {
-        if (weekday.foreign) continue;
-        const dayKey = weekday.key;
-        const assignments = state.assignments[dayKey]?.[member] || [];
-
-        // Build consecutive ranges of the same brand
-        const ranges = [];
-        let current = null;
-        for (let slotIdx = 0; slotIdx < slots.length; slotIdx++) {
-          const brandId = assignments[slotIdx];
-          if (brandId === "LUNCH" || !brandId) {
-            if (current) { ranges.push(current); current = null; }
-            continue;
-          }
-          if (current && current.brandId === brandId) {
-            current.endIdx = slotIdx;
-          } else {
-            if (current) ranges.push(current);
-            current = { brandId, startIdx: slotIdx, endIdx: slotIdx };
+      // Collect all brands this member is assigned to
+      const memberBrands = new Map(); // brandId -> brand object
+      for (const month of MONTHS) {
+        const monthDays = buildMonthWeekdays(month.year, month.month);
+        for (const day of monthDays) {
+          if (day.foreign || isHoliday(day.key)) continue;
+          const assignments = state.assignments[day.key]?.[member] || [];
+          for (const brandId of assignments) {
+            if (brandId && brandId !== "LUNCH") {
+              if (!memberBrands.has(brandId)) {
+                memberBrands.set(brandId, brandById.get(brandId));
+              }
+            }
           }
         }
-        if (current) ranges.push(current);
+      }
 
-        for (const range of ranges) {
-          const startSlot = slots[range.startIdx];
-          // End label = start of next slot (i.e. +30 min from endIdx)
-          const endMinTotal = slots[range.endIdx].hour * 60 + slots[range.endIdx].minute + 30;
-          const endHour = Math.floor(endMinTotal / 60);
-          const endMin = endMinTotal % 60;
-          const endLabel = toLabel(endHour, endMin);
-          const hours = ((range.endIdx - range.startIdx + 1) * 0.5).toFixed(1);
-          const brand = brandById.get(range.brandId);
-          const brandName = brand ? brand.name : "";
+      // For each brand this member has
+      for (const [brandId, brand] of memberBrands) {
+        sheet.cell(`A${rowNum}`).value(member);
+        sheet.cell(`B${rowNum}`).value(brand?.name || "");
+        if (brand) {
+          const cellB = sheet.cell(`B${rowNum}`);
+          applyFillColor(cellB, brand.color);
+          cellB.style("fontColor", "000000");
+        }
 
-          sheet.cell(`A${rowNum}`).value(member);
-          sheet.cell(`B${rowNum}`).value(weekday.label);
-          sheet.cell(`C${rowNum}`).value(`${startSlot.label} – ${endLabel}`);
-          sheet.cell(`D${rowNum}`).value(Number(hours));
-          sheet.cell(`E${rowNum}`).value(brandName);
+        // Calculate hours for each month
+        for (let mIdx = 0; mIdx < MONTHS.length; mIdx++) {
+          const month = MONTHS[mIdx];
+          const monthDays = buildMonthWeekdays(month.year, month.month);
+          let monthHours = 0;
 
-          if (brand) {
-            const cellE = sheet.cell(`E${rowNum}`);
-            applyFillColor(cellE, brand.color);
-            cellE.style("fontColor", "000000");
+          for (const day of monthDays) {
+            if (day.foreign || isHoliday(day.key)) continue;
+            const assignments = state.assignments[day.key]?.[member] || [];
+            for (let slotIdx = 0; slotIdx < assignments.length; slotIdx++) {
+              if (assignments[slotIdx] === brandId) {
+                monthHours += 0.5; // Each slot is 30 min = 0.5 hours
+              }
+            }
           }
 
-          rowNum++;
+          sheet.cell(rowNum, mIdx + 3).value(monthHours > 0 ? monthHours : 0);
         }
+
+        rowNum++;
       }
     }
 
