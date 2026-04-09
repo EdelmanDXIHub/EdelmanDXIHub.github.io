@@ -614,7 +614,7 @@ function attachEvents() {
     renderTable();
     renderTotals();
     const ok = await saveState(clearedDays);
-    showToast(ok ? `All assignments cleared for ${MONTHS[currentMonthIdx].label}` : "Sync failed — changes saved locally", ok ? "success" : "error");
+    if (ok) showToast(`All assignments cleared for ${MONTHS[currentMonthIdx].label}`, "success");
   });
 
   addMemberBtn.addEventListener("click", async () => {
@@ -622,7 +622,6 @@ function attachEvents() {
     if (!name || !name.trim()) return;
     const clean = name.trim();
     if (state.members.includes(clean)) {
-      showToast("Team member already exists", "error");
       return;
     }
     state.members.push(clean);
@@ -634,7 +633,7 @@ function attachEvents() {
     renderTable();
     renderTotals();
     const ok = await saveState(addedDays);
-    showToast(ok ? `Team member "${clean}" added` : "Sync failed — changes saved locally", ok ? "success" : "error");
+    if (ok) showToast(`Team member "${clean}" added`, "success");
   });
 
   removeMemberBtn.addEventListener("click", async () => {
@@ -661,7 +660,7 @@ function attachEvents() {
     renderTable();
     renderTotals();
     const ok = await saveState();
-    showToast(ok ? `Team member "${memberName}" removed` : "Sync failed — changes saved locally", ok ? "success" : "error");
+    if (ok) showToast(`Team member "${memberName}" removed`, "success");
   });
 
   addBrandBtn.addEventListener("click", async () => {
@@ -674,7 +673,7 @@ function attachEvents() {
     renderPalette();
     renderTable();
     const ok = await saveState();
-    showToast(ok ? `Brand "${result.name}" added` : "Sync failed — changes saved locally", ok ? "success" : "error");
+    if (ok) showToast(`Brand "${result.name}" added`, "success");
   });
 
   exportExcelBtn.addEventListener("click", async () => {
@@ -720,7 +719,7 @@ function attachEvents() {
     if (_lastPaintSyncPromise) {
       const ok = await _lastPaintSyncPromise;
       _lastPaintSyncPromise = null;
-      showToast(ok ? "Changes synced" : "Sync failed — changes saved locally", ok ? "success" : "error");
+      if (ok) showToast("Changes synced", "success");
     }
   });
 
@@ -822,7 +821,6 @@ async function exportScheduleToNewExcel() {
     showToast("Excel exported successfully");
   } catch (error) {
     console.error(error);
-    showToast(`Export failed: ${error?.message || "Please try again"}`, "error");
   } finally {
     exportExcelBtn.disabled = false;
     exportExcelBtn.textContent = "Export Excel";
@@ -929,7 +927,7 @@ async function editBrand(brandId) {
   renderTable();
   renderTotals();
   const ok = await saveState();
-  showToast(ok ? `Brand "${result.name}" updated` : "Sync failed — changes saved locally", ok ? "success" : "error");
+  if (ok) showToast(`Brand "${result.name}" updated`, "success");
 }
 
 async function deleteBrand(brandId) {
@@ -960,7 +958,7 @@ async function deleteBrand(brandId) {
   renderTable();
   renderTotals();
   const ok = await saveState(affectedDays);
-  showToast(ok ? `Brand "${brand.name}" deleted` : "Sync failed — changes saved locally", ok ? "success" : "error");
+  if (ok) showToast(`Brand "${brand.name}" deleted`, "success");
 }
 
 function openBrandModal(title, name, color) {
@@ -1113,7 +1111,7 @@ function openRecurringModal() {
     renderTable();
     renderTotals();
     const ok = await saveState(targetDays);
-    showToast(ok ? `Schedule applied to ${targetDays.length} day(s), ${count} slot(s) updated` : "Sync failed — changes saved locally", ok ? "success" : "error");
+    if (ok) showToast(`Schedule applied to ${targetDays.length} day(s), ${count} slot(s) updated`, "success");
   };
 
   modal.hidden = false;
