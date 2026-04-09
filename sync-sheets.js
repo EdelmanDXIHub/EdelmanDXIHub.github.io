@@ -158,12 +158,23 @@ function _decompressData(data) {
     for (const member of Object.keys(data.assignments[day])) {
       const val = data.assignments[day][member];
       if (typeof val !== 'string') { out.assignments[day][member] = val; continue; }
-      out.assignments[day][member] = val.split('').map(c => {
-        if (c === '.') return null;
-        if (c === 'L') return 'LUNCH';
-        // c is like 'B0', 'B1', etc.
-        return brandIds[c] || null;
-      });
+      // Parse multi-char tokens: '.' → null, 'L' → LUNCH, 'B0'/'B1'/... → brandId
+      const slots = [];
+      let i = 0;
+      while (i < val.length) {
+        const c = val[i];
+        if (c === '.') { slots.push(null); i++; }
+        else if (c === 'L') { slots.push('LUNCH'); i++; }
+        else if (c === 'B') {
+          let j = i + 1;
+          while (j < val.length && val[j] >= '0' && val[j] <= '9') j++;
+          slots.push(brandIds[val.substring(i, j)] || null);
+          i = j;
+        } else {
+          slots.push(null); i++;
+        }
+      }
+      out.assignments[day][member] = slots;
     }
   }
   return out;
