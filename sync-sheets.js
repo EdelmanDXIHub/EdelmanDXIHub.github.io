@@ -251,16 +251,29 @@ async function _sendFullState(state) {
   const jsonStr = JSON.stringify(_compressData(fullData));
   console.log("📤 Datos: " + Math.round(jsonStr.length / 1024) + "KB (comprimido)");
 
-  // Send as a single GET request (compressed data is small enough).
-  return await _sendGetSaveAll(jsonStr);
+  // Split into 1000-char chunks. After URL-encoding, each chunk becomes ~3000 chars,
+  // keeping total URL well under Apps Script's limit.
+  const CHUNK_SIZE = 1000;
+  const totalChunks = Math.ceil(jsonStr.length / CHUNK_SIZE);
+
+  for (let i = 0; i < totalChunks; i++) {
+    const chunk = jsonStr.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+    const result = await _sendGetSaveAll(chunk, i, totalChunks);
+    if (!result.ok) return result;
+    // Brief pause between chunks to avoid overwhelming PropertiesService
+    if (i < totalChunks - 1) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+  return { ok: true };
 }
 
-async function _sendGetSaveAll(data) {
+async function _sendGetSaveAll(data, chunkIndex, totalChunks) {
   try {
     const url = WEB_APP_URL
       + "?action=saveAllChunk"
-      + "&chunk=0"
-      + "&total=1"
+      + "&chunk=" + chunkIndex
+      + "&total=" + totalChunks
       + "&data=" + encodeURIComponent(data);
 
     // Use redirect:'manual' so we intercept Apps Script's 302 redirect instead of
