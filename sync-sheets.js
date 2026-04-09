@@ -34,7 +34,7 @@ async function loadDataFromSheet() {
     
     if (result.values && result.values[0] && result.values[0][0]) {
       const jsonString = result.values[0][0];
-      const sheetData = JSON.parse(jsonString);
+      const sheetData = _decompressData(JSON.parse(jsonString));
       members = Array.isArray(sheetData.members) ? sheetData.members : [];
       brands = Array.isArray(sheetData.brands) ? sheetData.brands : [];
       assignments = sheetData.assignments || {};
@@ -79,6 +79,79 @@ let _syncTimer = null;
 let _pendingResolvers = [];
 let _flushing = false;
 let _postWorks = null; // null = untested, true/false = tested
+
+/**
+ * Compress assignments before saving to Sheets.
+ * Skips empty member-days (all null/LUNCH) and encodes slot arrays as compact strings.
+ * Reduces size from ~163KB to ~5-10KB, well under the 50,000-char Sheets cell limit.
+ *   null → '.'   LUNCH → 'L'   bN → base-36 digit (1→'1', 10→'a', ...)
+ */
+function _compressData(data) {
+  const out = {
+    _v: 2,
+    members: data.members,
+    brands: data.brands,
+    assignments: {}
+  };
+
+  for (const day of Object.keys(data.assignments)) {
+    if (day === '_config') {
+      out.assignments._config = data.assignments._config;
+      continue;
+    }
+    const dayObj = data.assignments[day];
+    if (!dayObj || typeof dayObj !== 'object') continue;
+
+    const compDay = {};
+    for (const member of Object.keys(dayObj)) {
+      const slots = dayObj[member];
+      if (!Array.isArray(slots)) continue;
+      // Skip member-days with no brand assignments (only null/LUNCH)
+      if (!slots.some(v => v !== null && v !== undefined && v !== 'LUNCH')) continue;
+      compDay[member] = slots.map(v => {
+        if (v === null || v === undefined) return '.';
+        if (v === 'LUNCH') return 'L';
+        const n = parseInt(v.substring(1));
+        return isNaN(n) ? '.' : n.toString(36);
+      }).join('');
+    }
+    if (Object.keys(compDay).length > 0) {
+      out.assignments[day] = compDay;
+    }
+  }
+  return out;
+}
+
+/**
+ * Decompress data saved in v2 compact format back to slot arrays.
+ * Days/members missing from compressed data are reconstructed by the app as empty.
+ */
+function _decompressData(data) {
+  if (!data || !data._v || data._v < 2) return data; // already expanded
+  const out = {
+    members: data.members || [],
+    brands: data.brands || [],
+    assignments: {}
+  };
+  for (const day of Object.keys(data.assignments)) {
+    if (day === '_config') {
+      out.assignments._config = data.assignments._config;
+      continue;
+    }
+    out.assignments[day] = {};
+    for (const member of Object.keys(data.assignments[day])) {
+      const val = data.assignments[day][member];
+      if (typeof val !== 'string') { out.assignments[day][member] = val; continue; }
+      out.assignments[day][member] = val.split('').map(c => {
+        if (c === '.') return null;
+        if (c === 'L') return 'LUNCH';
+        const n = parseInt(c, 36);
+        return isNaN(n) ? null : 'b' + n.toString();
+      });
+    }
+  }
+  return out;
+}
 
 function syncDataToSheet(state, changedDays) {
   if (!WEB_APP_URL) {
@@ -149,8 +222,8 @@ async function _sendFullState(state) {
   for (const key of Object.keys(state.assignments)) {
     fullData.assignments[key] = state.assignments[key];
   }
-  const jsonStr = JSON.stringify(fullData);
-  console.log("📤 Datos: " + Math.round(jsonStr.length / 1024) + "KB");
+  const jsonStr = JSON.stringify(_compressData(fullData));
+  console.log("📤 Datos: " + Math.round(jsonStr.length / 1024) + "KB (comprimido)");
 
   // Try POST if not known to fail
   if (_postWorks !== false) {
