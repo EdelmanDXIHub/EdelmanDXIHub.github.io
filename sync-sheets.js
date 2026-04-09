@@ -262,8 +262,9 @@ async function _sendFullState(state) {
  * Each chunk writes to PropertiesService; the last chunk triggers assembly + save.
  */
 async function _sendViaGetChunked(jsonStr) {
-  // Google Apps Script GET URLs can safely handle ~6000 chars of encoded data
-  const CHUNK_SIZE = 5000;
+  // After URL-encoding, JSON chars like {, ", : expand ~2x.
+  // Keep raw chunk at 1500 chars so encoded URL stays well under 4000 chars total.
+  const CHUNK_SIZE = 1500;
   const totalChunks = Math.ceil(jsonStr.length / CHUNK_SIZE);
 
   if (totalChunks === 1) {
