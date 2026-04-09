@@ -268,9 +268,15 @@ async function _sendFullState(state) {
 
   // Verify that the data was actually written to the Sheet.
   // opaqueredirect only confirms HTTP delivery — not that Apps Script wrote to Sheets.
-  // Wait for Apps Script to finish, then read back and compare.
-  await new Promise(r => setTimeout(r, 2000));
-  const verified = await _verifySheetSave(state.members.length, state.brands.length);
+  // Wait for Apps Script to finish, then read back and compare actual slot count.
+  await new Promise(r => setTimeout(r, 2500));
+  let verified = await _verifySheetSave(jsonStr);
+  if (!verified) {
+    // Sheets API may have stale cache — retry once after extra wait
+    console.warn("⚠️ Primer intento de verificación falló, reintentando...");
+    await new Promise(r => setTimeout(r, 3000));
+    verified = await _verifySheetSave(jsonStr);
+  }
   if (!verified) {
     console.error("⚠️ Verificación falló: el Sheet no refleja los datos enviados");
     return { ok: false, error: "Verification failed" };
@@ -278,19 +284,37 @@ async function _sendFullState(state) {
   return { ok: true };
 }
 
-async function _verifySheetSave(expectedMembers, expectedBrands) {
+function _countAssignedSlots(data) {
+  let count = 0;
+  for (const dayKey of Object.keys(data.assignments || {})) {
+    if (dayKey === '_config') continue;
+    for (const member of Object.keys(data.assignments[dayKey])) {
+      const slots = data.assignments[dayKey][member];
+      if (Array.isArray(slots)) {
+        for (const slot of slots) {
+          if (slot && slot !== 'LUNCH') count++;
+        }
+      }
+    }
+  }
+  return count;
+}
+
+async function _verifySheetSave(expectedJsonStr) {
   try {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!${SHEET_RANGE}?key=${API_KEY}`;
     const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) return false;
     const result = await response.json();
     if (!result.values || !result.values[0] || !result.values[0][0]) return false;
-    const saved = _decompressData(JSON.parse(result.values[0][0]));
-    const savedMembers = Array.isArray(saved.members) ? saved.members.length : 0;
-    const savedBrands = Array.isArray(saved.brands) ? saved.brands.length : 0;
-    const ok = savedMembers === expectedMembers && savedBrands === expectedBrands;
-    if (ok) console.log("✅ Verificación exitosa: datos confirmados en Sheet");
-    else console.warn(`⚠️ Verificación: esperado ${expectedMembers}m/${expectedBrands}b, Sheet tiene ${savedMembers}m/${savedBrands}b`);
+    const savedJson = result.values[0][0];
+    const expectedData = _decompressData(JSON.parse(expectedJsonStr));
+    const savedData = _decompressData(JSON.parse(savedJson));
+    const expectedSlots = _countAssignedSlots(expectedData);
+    const savedSlots = _countAssignedSlots(savedData);
+    const ok = expectedSlots === savedSlots;
+    if (ok) console.log(`✅ Verificación exitosa: ${savedSlots} slots asignados en Sheet`);
+    else console.warn(`⚠️ Verificación: esperado ${expectedSlots} slots, Sheet tiene ${savedSlots}`);
     return ok;
   } catch (e) {
     console.warn("⚠️ No se pudo verificar el guardado:", e.message);
