@@ -728,9 +728,9 @@ function attachEvents() {
     renderTable();
     renderTotals();
     if (_lastPaintSyncPromise) {
-      const ok = await _lastPaintSyncPromise;
+      // Resolve silently — mouse was released outside the schedule (e.g. over brand palette)
+      await _lastPaintSyncPromise;
       _lastPaintSyncPromise = null;
-      showToast(ok ? "Changes synced" : "Sync failed — changes saved locally", ok ? "success" : "error");
     }
   });
 }
