@@ -265,7 +265,37 @@ async function _sendFullState(state) {
       await new Promise(r => setTimeout(r, 300));
     }
   }
+
+  // Verify that the data was actually written to the Sheet.
+  // opaqueredirect only confirms HTTP delivery — not that Apps Script wrote to Sheets.
+  // Wait for Apps Script to finish, then read back and compare.
+  await new Promise(r => setTimeout(r, 2000));
+  const verified = await _verifySheetSave(state.members.length, state.brands.length);
+  if (!verified) {
+    console.error("⚠️ Verificación falló: el Sheet no refleja los datos enviados");
+    return { ok: false, error: "Verification failed" };
+  }
   return { ok: true };
+}
+
+async function _verifySheetSave(expectedMembers, expectedBrands) {
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!${SHEET_RANGE}?key=${API_KEY}`;
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) return false;
+    const result = await response.json();
+    if (!result.values || !result.values[0] || !result.values[0][0]) return false;
+    const saved = _decompressData(JSON.parse(result.values[0][0]));
+    const savedMembers = Array.isArray(saved.members) ? saved.members.length : 0;
+    const savedBrands = Array.isArray(saved.brands) ? saved.brands.length : 0;
+    const ok = savedMembers === expectedMembers && savedBrands === expectedBrands;
+    if (ok) console.log("✅ Verificación exitosa: datos confirmados en Sheet");
+    else console.warn(`⚠️ Verificación: esperado ${expectedMembers}m/${expectedBrands}b, Sheet tiene ${savedMembers}m/${savedBrands}b`);
+    return ok;
+  } catch (e) {
+    console.warn("⚠️ No se pudo verificar el guardado:", e.message);
+    return true; // don't block on network error during verify
+  }
 }
 
 async function _sendGetSaveAll(data, chunkIndex, totalChunks) {

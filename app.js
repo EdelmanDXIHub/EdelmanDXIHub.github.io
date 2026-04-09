@@ -733,7 +733,7 @@ function attachEvents() {
     if (_lastPaintSyncPromise) {
       const ok = await _lastPaintSyncPromise;
       _lastPaintSyncPromise = null;
-      if (ok) showToast("Changes synced", "success");
+      showToast(ok ? "Changes synced" : "⚠️ No se pudo guardar, intenta de nuevo", ok ? "success" : "error");
     }
   });
 
@@ -1125,7 +1125,7 @@ function openRecurringModal() {
     renderTable();
     renderTotals();
     const ok = await saveState(targetDays);
-    if (ok) showToast(`Schedule applied to ${targetDays.length} day(s), ${count} slot(s) updated`, "success");
+    showToast(ok ? `Schedule applied to ${targetDays.length} day(s), ${count} slot(s) updated` : "⚠️ No se pudo guardar, intenta de nuevo", ok ? "success" : "error");
   };
 
   modal.hidden = false;
